@@ -5,20 +5,17 @@
 #include "ssde.h"
 
 #pragma alloc_text(INIT, DriverEntry)
-#pragma alloc_text(INIT, CreateApiDevice)
 #pragma alloc_text(PAGE, Worker_Delete)
 #pragma alloc_text(PAGE, Worker_Work)
 #pragma alloc_text(PAGE, Worker_MakeAndInitialize)
 #pragma alloc_text(PAGE, OnUnload)
 #pragma alloc_text(PAGE, OnCreate)
 #pragma alloc_text(PAGE, OnClose)
-#pragma alloc_text(PAGE, DestroyApiDevice)
-#pragma alloc_text(PAGE, OnApiGetInfo)
+#pragma alloc_text(PAGE, EnsureCustomKernelSignersIsLicensed)
+#pragma alloc_text(PAGE, EnsureCodeIntegrityProtectedIsLicensed)
+#pragma alloc_text(PAGE, EnsureCodeIntegrityWhqlSettingsIsSet)
 
 PSSDEWORKER Worker = NULL;
-NTSTATUS WorkerResult = STATUS_SUCCESS;
-ULONG ArmCount = 0;
-ULONG ArmWatchdog = 0;
 
 NTSTATUS
 Worker_Delete(PSSDEWORKER *__this)
@@ -50,7 +47,6 @@ Worker_Delete(PSSDEWORKER *__this)
             ZwClose(_this->ProductOptionsKeyChangeEventHandle);
             _this->ProductOptionsKeyChangeEventHandle = NULL;
         }
-
         if (_this->CodeIntegrityLicensedValueInfo)
         {
             ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
@@ -66,11 +62,9 @@ Worker_Delete(PSSDEWORKER *__this)
         {
             ObDereferenceObject(_this->CodeIntegrityProtectedKeyChangeEventObject);
             _this->CodeIntegrityProtectedKeyChangeEventObject = NULL;
-
             ZwClose(_this->CodeIntegrityProtectedKeyChangeEventHandle);
             _this->CodeIntegrityProtectedKeyChangeEventHandle = NULL;
         }
-
         if (_this->CodeIntegrityWhqlSettingsValueInfo)
         {
             ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
@@ -86,11 +80,9 @@ Worker_Delete(PSSDEWORKER *__this)
         {
             ObDereferenceObject(_this->CodeIntegrityPolicyKeyChangeEventObject);
             _this->CodeIntegrityPolicyKeyChangeEventObject = NULL;
-
             ZwClose(_this->CodeIntegrityPolicyKeyChangeEventHandle);
             _this->CodeIntegrityPolicyKeyChangeEventHandle = NULL;
         }
-
         if (_this->UnloadEventHandle)
         {
             ObDereferenceObject(_this->UnloadEventObject);
@@ -113,8 +105,8 @@ Worker_Delete(PSSDEWORKER *__this)
     return Status;
 }
 
-VOID
-Worker_Work(_In_ PSSDEWORKER *__this)
+NTSTATUS
+EnsureCustomKernelSignersIsLicensed(_In_ PSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -122,14 +114,255 @@ Worker_Work(_In_ PSSDEWORKER *__this)
     PSSDEWORKER _this = *__this;
     ULONG PolicyValueType = 0;
     ULONG CiAcpCks = 0;
+    ULONG ResultLength = 0;
+    ULONG uTag = 'ssde';
+    IO_STATUS_BLOCK IoStatusBlock;
+
+    Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
+    if (!NT_SUCCESS(Status))
+    {
+        return Status;
+    }
+    if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
+    {
+        Status = STATUS_OBJECT_TYPE_MISMATCH;
+        return Status;
+    }
+
+    if (CiAcpCks == 0)
+    {
+        while (1)
+        {
+            Status = ZwQueryValueKey(
+                _this->ProductOptionsKey,
+                &gProductPolicyValueName,
+                KeyValuePartialInformation,
+                _this->ProductPolicyValueInfo,
+                _this->ProductPolicyValueInfoSize,
+                &ResultLength);
+            if (NT_SUCCESS(Status))
+            {
+                break;
+            }
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+            {
+                ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
+                _this->ProductPolicyValueInfo =
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                if (_this->ProductPolicyValueInfo)
+                {
+                    _this->ProductPolicyValueInfoSize = ResultLength;
+                }
+                else
+                {
+                    _this->ProductPolicyValueInfoSize = 0;
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        ULONG uEdit = 1;
+        Status =
+            HandlePolicyBinary(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data, &uEdit);
+        if (!NT_SUCCESS(Status))
+        {
+            return Status;
+        }
+
+        Status = ExUpdateLicenseData(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data);
+    }
+
+    Status = ZwNotifyChangeKey(
+        _this->ProductOptionsKey,
+        _this->ProductOptionsKeyChangeEventHandle,
+        NULL,
+        NULL,
+        &IoStatusBlock,
+        REG_NOTIFY_CHANGE_LAST_SET,
+        FALSE,
+        NULL,
+        0,
+        TRUE);
+    if (!NT_SUCCESS(Status))
+    {
+        return Status;
+    }
+
+    return Status;
+}
+
+NTSTATUS
+EnsureCodeIntegrityProtectedIsLicensed(_In_ PSSDEWORKER *__this)
+{
+    PAGED_CODE();
+
+    NTSTATUS Status = STATUS_SUCCESS;
+    PSSDEWORKER _this = *__this;
     ULONG CiLicensed = 1;
+    ULONG ResultLength = 0;
+    ULONG uTag = 'ssde';
+    IO_STATUS_BLOCK IoStatusBlock;
+
+    while (1)
+    {
+        Status = ZwQueryValueKey(
+            _this->CodeIntegrityProtectedKey,
+            &gCodeIntegrityLicensedValueName,
+            KeyValuePartialInformation,
+            _this->CodeIntegrityLicensedValueInfo,
+            _this->CodeIntegrityLicensedValueInfoSize,
+            &ResultLength);
+        if (NT_SUCCESS(Status))
+        {
+            break;
+        }
+        else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+        {
+            ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
+            _this->CodeIntegrityLicensedValueInfo =
+                (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+            if (_this->CodeIntegrityLicensedValueInfo)
+            {
+                _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
+            }
+            else
+            {
+                _this->CodeIntegrityLicensedValueInfoSize = 0;
+                Status = STATUS_NO_MEMORY;
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (_this->CodeIntegrityLicensedValueInfo == NULL ||
+        _this->CodeIntegrityLicensedValueInfo->DataLength != sizeof(ULONG) ||
+        (*(PULONG)_this->CodeIntegrityLicensedValueInfo->Data) == 0)
+    {
+        Status = ZwSetValueKey(
+            _this->CodeIntegrityProtectedKey,
+            &gCodeIntegrityLicensedValueName,
+            0,
+            REG_DWORD,
+            &CiLicensed,
+            sizeof(ULONG));
+    }
+
+    Status = ZwNotifyChangeKey(
+        _this->CodeIntegrityProtectedKey,
+        _this->CodeIntegrityProtectedKeyChangeEventHandle,
+        NULL,
+        NULL,
+        &IoStatusBlock,
+        REG_NOTIFY_CHANGE_LAST_SET,
+        FALSE,
+        NULL,
+        0,
+        TRUE);
+    if (!NT_SUCCESS(Status))
+    {
+        return Status;
+    }
+
+    return Status;
+}
+
+NTSTATUS
+EnsureCodeIntegrityWhqlSettingsIsSet(_In_ PSSDEWORKER *__this)
+{
+    PAGED_CODE();
+
+    NTSTATUS Status = STATUS_SUCCESS;
+    PSSDEWORKER _this = *__this;
     ULONG CiWhqlSettings = 1;
     ULONG ResultLength = 0;
     ULONG uTag = 'ssde';
     IO_STATUS_BLOCK IoStatusBlock;
-    PKWAIT_BLOCK waitBlocks = NULL;
 
-    ArmWatchdog = 1;
+    while (1)
+    {
+        Status = ZwQueryValueKey(
+            _this->CodeIntegrityPolicyKey,
+            &gCodeIntegrityWhqlSettingsValueName,
+            KeyValuePartialInformation,
+            _this->CodeIntegrityWhqlSettingsValueInfo,
+            _this->CodeIntegrityWhqlSettingsValueInfoSize,
+            &ResultLength);
+        if (NT_SUCCESS(Status))
+        {
+            break;
+        }
+        else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+        {
+            ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
+            _this->CodeIntegrityWhqlSettingsValueInfo =
+                (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+            if (_this->CodeIntegrityWhqlSettingsValueInfo)
+            {
+                _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
+            }
+            else
+            {
+                _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
+                Status = STATUS_NO_MEMORY;
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL ||
+        _this->CodeIntegrityWhqlSettingsValueInfo->DataLength != sizeof(ULONG) ||
+        (*(PULONG)_this->CodeIntegrityWhqlSettingsValueInfo->Data) == 0)
+    {
+        Status = ZwSetValueKey(
+            _this->CodeIntegrityPolicyKey,
+            &gCodeIntegrityWhqlSettingsValueName,
+            0,
+            REG_DWORD,
+            &CiWhqlSettings,
+            sizeof(ULONG));
+    }
+
+    Status = ZwNotifyChangeKey(
+        _this->CodeIntegrityPolicyKey,
+        _this->CodeIntegrityPolicyKeyChangeEventHandle,
+        NULL,
+        NULL,
+        &IoStatusBlock,
+        REG_NOTIFY_CHANGE_LAST_SET,
+        FALSE,
+        NULL,
+        0,
+        TRUE);
+    if (!NT_SUCCESS(Status))
+    {
+        return Status;
+    }
+
+    return Status;
+}
+
+VOID
+Worker_Work(_In_ PSSDEWORKER *__this)
+{
+    PAGED_CODE();
+
+    NTSTATUS Status = STATUS_SUCCESS;
+    PSSDEWORKER _this = *__this;
+    ULONG uTag = 'ssde';
+    PKWAIT_BLOCK waitBlocks = NULL;
 
     PVOID objects[4];
     objects[0] = _this->UnloadEventObject;
@@ -141,213 +374,9 @@ Worker_Work(_In_ PSSDEWORKER *__this)
 
     while (1)
     {
-        Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
-        if (!NT_SUCCESS(Status))
-        {
-            break;
-        }
-        if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
-        {
-            Status = STATUS_OBJECT_TYPE_MISMATCH;
-            break;
-        }
-
-        if (CiAcpCks == 0)
-        {
-            while (1)
-            {
-                Status = ZwQueryValueKey(
-                    _this->ProductOptionsKey,
-                    &gProductPolicyValueName,
-                    KeyValuePartialInformation,
-                    _this->ProductPolicyValueInfo,
-                    _this->ProductPolicyValueInfoSize,
-                    &ResultLength);
-                if (NT_SUCCESS(Status))
-                {
-                    break;
-                }
-                else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
-                {
-                    ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
-                    _this->ProductPolicyValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
-                    if (_this->ProductPolicyValueInfo)
-                    {
-                        _this->ProductPolicyValueInfoSize = ResultLength;
-                    }
-                    else
-                    {
-                        _this->ProductPolicyValueInfoSize = 0;
-                        Status = STATUS_NO_MEMORY;
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            ULONG uEdit = 1;
-            Status = HandlePolicyBinary(
-                _this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data, &uEdit);
-            if (!NT_SUCCESS(Status))
-            {
-                break;
-            }
-            if (!uEdit)
-            {
-                ArmCount++;
-            }
-
-            Status =
-                ExUpdateLicenseData(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data);
-        }
-
-        while (1)
-        {
-            Status = ZwQueryValueKey(
-                _this->CodeIntegrityProtectedKey,
-                &gCodeIntegrityLicensedValueName,
-                KeyValuePartialInformation,
-                _this->CodeIntegrityLicensedValueInfo,
-                _this->CodeIntegrityLicensedValueInfoSize,
-                &ResultLength);
-            if (NT_SUCCESS(Status))
-            {
-                break;
-            }
-            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
-            {
-                ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
-                _this->CodeIntegrityLicensedValueInfo =
-                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
-                if (_this->CodeIntegrityLicensedValueInfo)
-                {
-                    _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
-                }
-                else
-                {
-                    _this->CodeIntegrityLicensedValueInfoSize = 0;
-                    Status = STATUS_NO_MEMORY;
-                    break;
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        if (_this->CodeIntegrityLicensedValueInfo == NULL ||
-            _this->CodeIntegrityLicensedValueInfo->DataLength != sizeof(ULONG) ||
-            (*(PULONG)_this->CodeIntegrityLicensedValueInfo->Data) == 0)
-        {
-            Status = ZwSetValueKey(
-                _this->CodeIntegrityProtectedKey,
-                &gCodeIntegrityLicensedValueName,
-                0,
-                REG_DWORD,
-                &CiLicensed,
-                sizeof(ULONG));
-        }
-
-        while (1)
-        {
-            Status = ZwQueryValueKey(
-                _this->CodeIntegrityPolicyKey,
-                &gCodeIntegrityWhqlSettingsValueName,
-                KeyValuePartialInformation,
-                _this->CodeIntegrityWhqlSettingsValueInfo,
-                _this->CodeIntegrityWhqlSettingsValueInfoSize,
-                &ResultLength);
-            if (NT_SUCCESS(Status))
-            {
-                break;
-            }
-            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
-            {
-                ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
-                _this->CodeIntegrityWhqlSettingsValueInfo =
-                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
-                if (_this->CodeIntegrityWhqlSettingsValueInfo)
-                {
-                    _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
-                }
-                else
-                {
-                    _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
-                    Status = STATUS_NO_MEMORY;
-                    break;
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL ||
-            _this->CodeIntegrityWhqlSettingsValueInfo->DataLength != sizeof(ULONG) ||
-            (*(PULONG)_this->CodeIntegrityWhqlSettingsValueInfo->Data) == 0)
-        {
-            Status = ZwSetValueKey(
-                _this->CodeIntegrityPolicyKey,
-                &gCodeIntegrityWhqlSettingsValueName,
-                0,
-                REG_DWORD,
-                &CiWhqlSettings,
-                sizeof(ULONG));
-        }
-
-        Status = ZwNotifyChangeKey(
-            _this->ProductOptionsKey,
-            _this->ProductOptionsKeyChangeEventHandle,
-            NULL,
-            NULL,
-            &IoStatusBlock,
-            REG_NOTIFY_CHANGE_LAST_SET,
-            FALSE,
-            NULL,
-            0,
-            TRUE);
-        if (!NT_SUCCESS(Status))
-        {
-            break;
-        }
-
-        Status = ZwNotifyChangeKey(
-            _this->CodeIntegrityProtectedKey,
-            _this->CodeIntegrityProtectedKeyChangeEventHandle,
-            NULL,
-            NULL,
-            &IoStatusBlock,
-            REG_NOTIFY_CHANGE_LAST_SET,
-            FALSE,
-            NULL,
-            0,
-            TRUE);
-        if (!NT_SUCCESS(Status))
-        {
-            break;
-        }
-
-        Status = ZwNotifyChangeKey(
-            _this->CodeIntegrityPolicyKey,
-            _this->CodeIntegrityPolicyKeyChangeEventHandle,
-            NULL,
-            NULL,
-            &IoStatusBlock,
-            REG_NOTIFY_CHANGE_LAST_SET,
-            FALSE,
-            NULL,
-            0,
-            TRUE);
-        if (!NT_SUCCESS(Status))
-        {
-            break;
-        }
+        EnsureCustomKernelSignersIsLicensed(__this);
+        EnsureCodeIntegrityProtectedIsLicensed(__this);
+        EnsureCodeIntegrityWhqlSettingsIsSet(__this);
 
         if (objects && objectsCount)
         {
@@ -366,19 +395,25 @@ Worker_Work(_In_ PSSDEWORKER *__this)
 
         Status =
             KeWaitForMultipleObjects(objectsCount, objects, WaitAny, Executive, KernelMode, FALSE, NULL, waitBlocks);
-        if (Status != STATUS_WAIT_1)
+        if (Status != STATUS_WAIT_1 && Status != STATUS_WAIT_2 && Status != STATUS_WAIT_3)
         {
             break;
         }
 
+        if (waitBlocks != NULL)
+        {
+            ExFreePoolWithTag(waitBlocks, uTag);
+            waitBlocks = NULL;
+        }
+    }
+
+    if (waitBlocks != NULL)
+    {
         ExFreePoolWithTag(waitBlocks, uTag);
+        waitBlocks = NULL;
     }
 
     Worker_Delete(__this);
-
-    ArmWatchdog = 2;
-
-    WorkerResult = Status;
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -487,7 +522,6 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
     {
         goto finalize;
     }
-
     InitializeObjectAttributes(&KeyAttribute, &gCodeIntegrityPolicyKeyName, OBJ_CASE_INSENSITIVE, NULL, NULL);
     Status = ZwOpenKey(&(_this->CodeIntegrityPolicyKey), KEY_READ, &KeyAttribute);
     if (!NT_SUCCESS(Status))
@@ -611,8 +645,6 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
         goto finalize;
     }
 
-    return CreateApiDevice(DriverObject);
-
 finalize:
     return Status;
 }
@@ -621,6 +653,8 @@ VOID
 OnUnload(PDRIVER_OBJECT DriverObject)
 {
     PAGED_CODE(); // keep the static analysis tools happy
+
+    UNREFERENCED_PARAMETER(DriverObject);
 
     if (Worker)
     {
@@ -631,8 +665,6 @@ OnUnload(PDRIVER_OBJECT DriverObject)
         ObDereferenceObject(WorkerObject);
         ZwClose(WorkerHandle);
     }
-
-    DestroyApiDevice(DriverObject);
 }
 
 FORCEINLINE
@@ -685,25 +717,7 @@ OnDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
 
-    ULONG numret = 0;
-    PVOID buf = Irp->AssociatedIrp.SystemBuffer;
-    PIO_STACK_LOCATION sl = IoGetCurrentIrpStackLocation(Irp);
-    ULONG inlen = sl->Parameters.DeviceIoControl.InputBufferLength;
-    ULONG outlen = sl->Parameters.DeviceIoControl.OutputBufferLength;
-    NTSTATUS status;
-
-    switch (sl->Parameters.DeviceIoControl.IoControlCode)
-    {
-    case IOCTL_SELFSIGN_GET_VERSION: {
-        status = OnApiGetInfo(buf, inlen, outlen, &numret);
-        break;
-    }
-    default: {
-        status = STATUS_INVALID_PARAMETER;
-        break;
-    }
-    }
-    return IrpDispatchDoneEx(Irp, status, numret);
+    return IrpDispatchDoneEx(Irp, STATUS_INVALID_PARAMETER, 0);
 }
 
 NTSTATUS
@@ -712,78 +726,4 @@ OnOther(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     UNREFERENCED_PARAMETER(DeviceObject);
 
     return IrpDispatchDone(Irp, STATUS_INVALID_DEVICE_REQUEST);
-}
-
-/*  ************************************************************************  */
-/*  API Support  */
-
-#define API_DEVICE_NAME L"\\Device\\" SSDE_DEVICE_NAME
-#define API_LINK_NAME L"\\??\\" SSDE_DEVICE_NAME
-
-PDEVICE_OBJECT ApiDevice = NULL;
-
-NTSTATUS
-CreateApiDevice(PDRIVER_OBJECT DriverObject)
-{
-    UNICODE_STRING devname;
-    RtlInitUnicodeString(&devname, API_DEVICE_NAME);
-
-    PDEVICE_OBJECT devobj;
-    NTSTATUS status = IoCreateDevice(DriverObject, 0, &devname, FILE_DEVICE_UNKNOWN, 0, TRUE, &devobj);
-    if (NT_SUCCESS(status))
-    {
-        UNICODE_STRING linkname;
-
-        RtlInitUnicodeString(&linkname, API_LINK_NAME);
-
-        status = IoCreateSymbolicLink(&linkname, &devname);
-        if (NT_SUCCESS(status))
-        {
-            ApiDevice = devobj;
-            return STATUS_SUCCESS;
-        }
-
-        IoDeleteDevice(devobj);
-    }
-    return status;
-}
-
-VOID
-DestroyApiDevice(PDRIVER_OBJECT DriverObject)
-{
-    PAGED_CODE();
-
-    UNREFERENCED_PARAMETER(DriverObject);
-
-    if (ApiDevice == NULL)
-        return;
-
-    UNICODE_STRING linkname;
-    RtlInitUnicodeString(&linkname, API_LINK_NAME);
-    IoDeleteSymbolicLink(&linkname);
-
-    IoDeleteDevice(ApiDevice);
-}
-
-NTSTATUS
-OnApiGetInfo(PVOID Buffer, ULONG InLen, ULONG OutLen, ULONG *NumRet)
-{
-    PAGED_CODE();
-
-    SSDE_API_INFO *pver;
-
-    if (InLen != 0 || OutLen != sizeof(*pver) || Buffer == NULL)
-    {
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    pver = (SSDE_API_INFO *)Buffer;
-    pver->Minor = SSDE_API_MINOR_VERSION;
-    pver->Major = SSDE_API_MAJOR_VERSION;
-    pver->ArmCount = ArmCount;
-    pver->Status = ArmWatchdog;
-    ExGetLicenseTamperState(&(pver->TamperState));
-
-    *NumRet = sizeof(*pver);
-    return STATUS_SUCCESS;
 }

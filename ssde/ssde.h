@@ -78,4 +78,11 @@ VOID
 Worker_Work(PSSDEWORKER *);
 NTSTATUS
 Worker_MakeAndInitialize(PSSDEWORKER *);
+
+NTSTATUS
+EnsureCustomKernelSignersIsLicensed(PSSDEWORKER *);
+NTSTATUS
+EnsureCodeIntegrityProtectedIsLicensed(PSSDEWORKER *);
+NTSTATUS
+EnsureCodeIntegrityWhqlSettingsIsSet(PSSDEWORKER *);
 #endif
