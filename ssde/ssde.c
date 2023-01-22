@@ -60,6 +60,51 @@ Worker_Delete(PSSDEWORKER* __this)
             ZwClose(_this->ProductOptionsKeyChangeEventHandle);
             _this->ProductOptionsKeyChangeEventHandle = NULL;
         }
+
+        if (_this->CodeIntegrityLicensedValueInfo)
+        {
+            ExFreePoolWithTag(
+                _this->CodeIntegrityLicensedValueInfo,
+                uTag
+            );
+            _this->CodeIntegrityLicensedValueInfo = NULL;
+            _this->CodeIntegrityLicensedValueInfoSize = 0;
+        }
+        if (_this->CodeIntegrityProtectedKey)
+        {
+            ZwClose(_this->CodeIntegrityProtectedKey);
+            _this->CodeIntegrityProtectedKey = NULL;
+        }
+        if (_this->CodeIntegrityProtectedKeyChangeEventHandle) {
+            ObDereferenceObject(_this->CodeIntegrityProtectedKeyChangeEventObject);
+            _this->CodeIntegrityProtectedKeyChangeEventObject = NULL;
+
+            ZwClose(_this->CodeIntegrityProtectedKeyChangeEventHandle);
+            _this->CodeIntegrityProtectedKeyChangeEventHandle = NULL;
+        }
+
+        if (_this->CodeIntegrityWhqlSettingsValueInfo)
+        {
+            ExFreePoolWithTag(
+                _this->CodeIntegrityWhqlSettingsValueInfo,
+                uTag
+            );
+            _this->CodeIntegrityWhqlSettingsValueInfo = NULL;
+            _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
+        }
+        if (_this->CodeIntegrityPolicyKey)
+        {
+            ZwClose(_this->CodeIntegrityPolicyKey);
+            _this->CodeIntegrityPolicyKey = NULL;
+        }
+        if (_this->CodeIntegrityPolicyKeyChangeEventHandle) {
+            ObDereferenceObject(_this->CodeIntegrityPolicyKeyChangeEventObject);
+            _this->CodeIntegrityPolicyKeyChangeEventObject = NULL;
+
+            ZwClose(_this->CodeIntegrityPolicyKeyChangeEventHandle);
+            _this->CodeIntegrityPolicyKeyChangeEventHandle = NULL;
+        }
+
         if (_this->UnloadEventHandle) {
             ObDereferenceObject(_this->UnloadEventObject);
             _this->UnloadEventObject = NULL;
@@ -90,15 +135,19 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
     PSSDEWORKER _this = *__this;
     ULONG PolicyValueType = 0;
     ULONG CiAcpCks = 0;
+    ULONG CiLicensed = 1;
+    ULONG CiWhqlSettings = 1;
     ULONG ResultLength = 0;
     ULONG uTag = 'ssde';
     IO_STATUS_BLOCK IoStatusBlock;
 
     ArmWatchdog = 1;
 
-    PVOID objects[2];
+    PVOID objects[4];
     objects[0] = _this->UnloadEventObject;
     objects[1] = _this->ProductOptionsKeyChangeEventObject;
+    objects[2] = _this->CodeIntegrityProtectedKeyChangeEventObject;
+    objects[3] = _this->CodeIntegrityPolicyKeyChangeEventObject;
 
     while (1)
     {
@@ -180,6 +229,108 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
             );
         }
 
+        while (1) {
+            Status = ZwQueryValueKey(
+                _this->CodeIntegrityProtectedKey,
+                &gCodeIntegrityLicensedValueName,
+                KeyValuePartialInformation,
+                _this->CodeIntegrityLicensedValueInfo,
+                _this->CodeIntegrityLicensedValueInfoSize,
+                &ResultLength
+            );
+            if (NT_SUCCESS(Status)) {
+                break;
+            }
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL) {
+#pragma warning (disable: 6387)
+                ExFreePoolWithTag(
+                    _this->CodeIntegrityLicensedValueInfo,
+                    uTag
+                );
+#pragma warning (default: 6387)
+                _this->CodeIntegrityLicensedValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
+                    PagedPool,
+                    ResultLength,
+                    uTag
+                );
+                if (_this->CodeIntegrityLicensedValueInfo) {
+                    _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
+                }
+                else {
+                    _this->CodeIntegrityLicensedValueInfoSize = 0;
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+            else {
+                break;
+            }
+        }
+
+        if (_this->CodeIntegrityLicensedValueInfo == NULL || 
+            _this->CodeIntegrityLicensedValueInfo->DataLength != sizeof(ULONG) || 
+            (*(PULONG)_this->CodeIntegrityLicensedValueInfo->Data) == 0) {
+            Status = ZwSetValueKey(
+                _this->CodeIntegrityProtectedKey, 
+                &gCodeIntegrityLicensedValueName, 
+                0, 
+                REG_DWORD, 
+                &CiLicensed, 
+                sizeof(ULONG)
+            );
+        }
+
+        while (1) {
+            Status = ZwQueryValueKey(
+                _this->CodeIntegrityPolicyKey,
+                &gCodeIntegrityWhqlSettingsValueName,
+                KeyValuePartialInformation,
+                _this->CodeIntegrityWhqlSettingsValueInfo,
+                _this->CodeIntegrityWhqlSettingsValueInfoSize,
+                &ResultLength
+            );
+            if (NT_SUCCESS(Status)) {
+                break;
+            }
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL) {
+#pragma warning (disable: 6387)
+                ExFreePoolWithTag(
+                    _this->CodeIntegrityWhqlSettingsValueInfo,
+                    uTag
+                );
+#pragma warning (default: 6387)
+                _this->CodeIntegrityWhqlSettingsValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
+                    PagedPool,
+                    ResultLength,
+                    uTag
+                );
+                if (_this->CodeIntegrityWhqlSettingsValueInfo) {
+                    _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
+                }
+                else {
+                    _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+            else {
+                break;
+            }
+        }
+
+        if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL || 
+            _this->CodeIntegrityWhqlSettingsValueInfo->DataLength != sizeof(ULONG) || 
+            (*(PULONG)_this->CodeIntegrityWhqlSettingsValueInfo->Data) == 0) {
+            Status = ZwSetValueKey(
+                _this->CodeIntegrityPolicyKey,
+                &gCodeIntegrityWhqlSettingsValueName,
+                0,
+                REG_DWORD,
+                &CiWhqlSettings,
+                sizeof(ULONG)
+            );
+        }
+
         Status = ZwNotifyChangeKey(
             _this->ProductOptionsKey,
             _this->ProductOptionsKeyChangeEventHandle,
@@ -197,8 +348,42 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
             break;
         }
 
+        Status = ZwNotifyChangeKey(
+            _this->CodeIntegrityProtectedKey,
+            _this->CodeIntegrityProtectedKeyChangeEventHandle,
+            NULL,
+            NULL,
+            &IoStatusBlock,
+            REG_NOTIFY_CHANGE_LAST_SET,
+            FALSE,
+            NULL,
+            0,
+            TRUE
+        );
+        if (!NT_SUCCESS(Status))
+        {
+            break;
+        }
+
+        Status = ZwNotifyChangeKey(
+            _this->CodeIntegrityPolicyKey,
+            _this->CodeIntegrityPolicyKeyChangeEventHandle,
+            NULL,
+            NULL,
+            &IoStatusBlock,
+            REG_NOTIFY_CHANGE_LAST_SET,
+            FALSE,
+            NULL,
+            0,
+            TRUE
+        );
+        if (!NT_SUCCESS(Status))
+        {
+            break;
+        }
+
         Status = KeWaitForMultipleObjects(
-            2,
+            (sizeof(objects) / sizeof(PVOID)),
             objects,
             WaitAny,
             Executive,
@@ -278,6 +463,56 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
 
 
     Status = ZwCreateEvent(
+        &(_this->CodeIntegrityProtectedKeyChangeEventHandle),
+        EVENT_ALL_ACCESS,
+        NULL,
+        SynchronizationEvent,
+        FALSE
+    );
+    if (!NT_SUCCESS(Status))
+    {
+        goto finalize;
+    }
+    Status = ObReferenceObjectByHandle(
+        _this->CodeIntegrityProtectedKeyChangeEventHandle,
+        EVENT_ALL_ACCESS,
+        *ExEventObjectType,
+        KernelMode,
+        &(_this->CodeIntegrityProtectedKeyChangeEventObject),
+        NULL
+    );
+    if (!NT_SUCCESS(Status))
+    {
+        goto finalize;
+    }
+
+
+    Status = ZwCreateEvent(
+        &(_this->CodeIntegrityPolicyKeyChangeEventHandle),
+        EVENT_ALL_ACCESS,
+        NULL,
+        SynchronizationEvent,
+        FALSE
+    );
+    if (!NT_SUCCESS(Status))
+    {
+        goto finalize;
+    }
+    Status = ObReferenceObjectByHandle(
+        _this->CodeIntegrityPolicyKeyChangeEventHandle,
+        EVENT_ALL_ACCESS,
+        *ExEventObjectType,
+        KernelMode,
+        &(_this->CodeIntegrityPolicyKeyChangeEventObject),
+        NULL
+    );
+    if (!NT_SUCCESS(Status))
+    {
+        goto finalize;
+    }
+
+
+    Status = ZwCreateEvent(
         &(_this->UnloadEventHandle),
         EVENT_ALL_ACCESS,
         NULL,
@@ -321,6 +556,42 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
     }
 
 
+    InitializeObjectAttributes(
+        &KeyAttribute,
+        &gCodeIntegrityProtectedKeyName,
+        OBJ_CASE_INSENSITIVE,
+        NULL,
+        NULL
+    );
+    Status = ZwOpenKey(
+        &(_this->CodeIntegrityProtectedKey),
+        KEY_READ,
+        &KeyAttribute
+    );
+    if (!NT_SUCCESS(Status))
+    {
+        goto finalize;
+    }
+
+
+    InitializeObjectAttributes(
+        &KeyAttribute,
+        &gCodeIntegrityPolicyKeyName,
+        OBJ_CASE_INSENSITIVE,
+        NULL,
+        NULL
+    );
+    Status = ZwOpenKey(
+        &(_this->CodeIntegrityPolicyKey),
+        KEY_READ,
+        &KeyAttribute
+    );
+    if (!NT_SUCCESS(Status))
+    {
+        goto finalize;
+    }
+
+
     ULONG ResultLength = 0;
     KEY_VALUE_PARTIAL_INFORMATION KeyInfo;
     Status = ZwQueryValueKey(
@@ -348,6 +619,60 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         goto finalize;
     }
     _this->ProductPolicyValueInfoSize = ResultLength;
+
+
+    Status = ZwQueryValueKey(
+        _this->CodeIntegrityProtectedKey,
+        &gCodeIntegrityLicensedValueName,
+        KeyValuePartialInformation,
+        &KeyInfo,
+        sizeof(KeyInfo),
+        &ResultLength
+    );
+    if (Status != STATUS_BUFFER_OVERFLOW &&
+        Status != STATUS_BUFFER_TOO_SMALL &&
+        Status != STATUS_SUCCESS)
+    {
+        goto finalize;
+    }
+    _this->CodeIntegrityLicensedValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
+        NonPagedPool,
+        ResultLength,
+        uTag
+    );
+    if (_this->CodeIntegrityLicensedValueInfo == NULL)
+    {
+        Status = STATUS_NO_MEMORY;
+        goto finalize;
+    }
+    _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
+
+
+    Status = ZwQueryValueKey(
+        _this->CodeIntegrityPolicyKey,
+        &gCodeIntegrityWhqlSettingsValueName,
+        KeyValuePartialInformation,
+        &KeyInfo,
+        sizeof(KeyInfo),
+        &ResultLength
+    );
+    if (Status != STATUS_BUFFER_OVERFLOW &&
+        Status != STATUS_BUFFER_TOO_SMALL &&
+        Status != STATUS_SUCCESS)
+    {
+        goto finalize;
+    }
+    _this->CodeIntegrityWhqlSettingsValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
+        NonPagedPool,
+        ResultLength,
+        uTag
+    );
+    if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL)
+    {
+        Status = STATUS_NO_MEMORY;
+        goto finalize;
+    }
+    _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
 
 
     _this->pFunc = Worker_Work;
