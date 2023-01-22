@@ -140,6 +140,7 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
     ULONG ResultLength = 0;
     ULONG uTag = 'ssde';
     IO_STATUS_BLOCK IoStatusBlock;
+    PKWAIT_BLOCK waitBlocks = NULL;
 
     ArmWatchdog = 1;
 
@@ -148,6 +149,8 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
     objects[1] = _this->ProductOptionsKeyChangeEventObject;
     objects[2] = _this->CodeIntegrityProtectedKeyChangeEventObject;
     objects[3] = _this->CodeIntegrityPolicyKeyChangeEventObject;
+
+    ULONG objectsCount = (sizeof(objects) / sizeof(PVOID));
 
     while (1)
     {
@@ -382,20 +385,42 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
             break;
         }
 
+        if (objects && objectsCount) {
+            if (objectsCount > THREAD_WAIT_OBJECTS) {
+                waitBlocks = (PKWAIT_BLOCK)ExAllocatePoolWithTag(
+                    NonPagedPool,
+                    objectsCount * sizeof(KWAIT_BLOCK),
+                    uTag
+                );
+
+                if (waitBlocks == NULL) {
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+        }
+
         Status = KeWaitForMultipleObjects(
-            (sizeof(objects) / sizeof(PVOID)),
+            objectsCount,
             objects,
             WaitAny,
             Executive,
             KernelMode,
             FALSE,
             NULL,
-            NULL
+            waitBlocks
         );
         if (Status != STATUS_WAIT_1)
         {
             break;
         }
+
+#pragma warning (disable: 6387)
+        ExFreePoolWithTag(
+            waitBlocks,
+            uTag
+        );
+#pragma warning (default: 6387)
     }
 
     Worker_Delete(__this);
