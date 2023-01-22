@@ -12,6 +12,12 @@ typedef struct _SSDEWORKER {
     HANDLE                          ProductOptionsKey;
     PKEY_VALUE_PARTIAL_INFORMATION  ProductPolicyValueInfo;
     ULONG                           ProductPolicyValueInfoSize;
+    HANDLE                          CodeIntegrityProtectedKey;
+    PKEY_VALUE_PARTIAL_INFORMATION  CodeIntegrityLicensedValueInfo;
+    ULONG                           CodeIntegrityLicensedValueInfoSize;
+    HANDLE                          CodeIntegrityPolicyKey;
+    PKEY_VALUE_PARTIAL_INFORMATION  CodeIntegrityWhqlSettingsValueInfo;
+    ULONG                           CodeIntegrityWhqlSettingsValueInfoSize;
 } SSDEWORKER, * PSSDEWORKER;
 
 UNICODE_STRING gProductOptionsKeyName =
@@ -22,6 +28,21 @@ RTL_CONSTANT_STRING(PRODUCT_POLICY_STR);
 
 UNICODE_STRING gCiAcpCksName =
 RTL_CONSTANT_STRING(L"CodeIntegrity-AllowConfigurablePolicy-CustomKernelSigners");
+
+
+UNICODE_STRING gCodeIntegrityProtectedKeyName =
+RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_PROTECTED_STR);
+
+UNICODE_STRING gCodeIntegrityLicensedValueName =
+RTL_CONSTANT_STRING(CODEINTEGRITY_LICENSED_STR);
+
+
+UNICODE_STRING gCodeIntegrityPolicyKeyName =
+RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_POLICY_STR);
+
+UNICODE_STRING gCodeIntegrityWhqlSettingsValueName =
+RTL_CONSTANT_STRING(CODEINTEGRITY_WHQL_SETTINGS_STR);
+
 
 NTSTATUS NTAPI ZwQueryLicenseValue(
     _In_ PUNICODE_STRING ValueName,

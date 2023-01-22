@@ -16,6 +16,12 @@
 #define PRODUCT_OPTIONS_STR L"SYSTEM\\CurrentControlSet\\Control\\ProductOptions"
 #define PRODUCT_POLICY_STR L"ProductPolicy"
 
+#define CODEINTEGRITY_PROTECTED_STR L"SYSTEM\\CurrentControlSet\\Control\\CI\\Protected"
+#define CODEINTEGRITY_LICENSED_STR L"Licensed"
+
+#define CODEINTEGRITY_POLICY_STR L"SYSTEM\\CurrentControlSet\\Control\\CI\\Policy"
+#define CODEINTEGRITY_WHQL_SETTINGS_STR L"WhqlSettings"
+
 typedef struct SSDE_API_INFO
 {
     USHORT Minor;
