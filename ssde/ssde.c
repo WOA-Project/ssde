@@ -1,35 +1,27 @@
-#pragma     warning (disable : 4514 4710 4711)
-#pragma     warning (push)
-#pragma     warning (disable : 4365)
-#include    <Ntifs.h>
-#include    <wdm.h>
-#pragma     warning (pop)
+#include <Ntifs.h>
+#include <wdm.h>
 
-#include    "../common.h"
-#include    "ssde.h"
+#include "../common.h"
+#include "ssde.h"
 
-DRIVER_INITIALIZE DriverEntry;
-
-__drv_dispatchType(IRP_MJ_CREATE) DRIVER_DISPATCH_PAGED OnCreate;
-__drv_dispatchType(IRP_MJ_CLOSE) DRIVER_DISPATCH_PAGED OnClose;
-__drv_dispatchType(IRP_MJ_DEVICE_CONTROL) DRIVER_DISPATCH OnDeviceControl;
-__drv_dispatchType_other DRIVER_DISPATCH OnOther;
-
-DRIVER_UNLOAD OnUnload;
-
-NTSTATUS CreateApiDevice(PDRIVER_OBJECT);
-VOID DestroyApiDevice(PDRIVER_OBJECT);
-
-NTSTATUS OnApiGetInfo(PVOID, ULONG, ULONG, ULONG*);
+#pragma alloc_text(INIT, DriverEntry)
+#pragma alloc_text(INIT, CreateApiDevice)
+#pragma alloc_text(PAGE, Worker_Delete)
+#pragma alloc_text(PAGE, Worker_Work)
+#pragma alloc_text(PAGE, Worker_MakeAndInitialize)
+#pragma alloc_text(PAGE, OnUnload)
+#pragma alloc_text(PAGE, OnCreate)
+#pragma alloc_text(PAGE, OnClose)
+#pragma alloc_text(PAGE, DestroyApiDevice)
+#pragma alloc_text(PAGE, OnApiGetInfo)
 
 PSSDEWORKER Worker = NULL;
 NTSTATUS WorkerResult = STATUS_SUCCESS;
 ULONG ArmCount = 0;
 ULONG ArmWatchdog = 0;
 
-#pragma code_seg ("PAGE")
 NTSTATUS
-Worker_Delete(PSSDEWORKER* __this)
+Worker_Delete(PSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -41,10 +33,7 @@ Worker_Delete(PSSDEWORKER* __this)
     {
         if (_this->ProductPolicyValueInfo)
         {
-            ExFreePoolWithTag(
-                _this->ProductPolicyValueInfo,
-                uTag
-            );
+            ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
             _this->ProductPolicyValueInfo = NULL;
             _this->ProductPolicyValueInfoSize = 0;
         }
@@ -53,7 +42,8 @@ Worker_Delete(PSSDEWORKER* __this)
             ZwClose(_this->ProductOptionsKey);
             _this->ProductOptionsKey = NULL;
         }
-        if (_this->ProductOptionsKeyChangeEventHandle) {
+        if (_this->ProductOptionsKeyChangeEventHandle)
+        {
             ObDereferenceObject(_this->ProductOptionsKeyChangeEventObject);
             _this->ProductOptionsKeyChangeEventObject = NULL;
 
@@ -63,10 +53,7 @@ Worker_Delete(PSSDEWORKER* __this)
 
         if (_this->CodeIntegrityLicensedValueInfo)
         {
-            ExFreePoolWithTag(
-                _this->CodeIntegrityLicensedValueInfo,
-                uTag
-            );
+            ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
             _this->CodeIntegrityLicensedValueInfo = NULL;
             _this->CodeIntegrityLicensedValueInfoSize = 0;
         }
@@ -75,7 +62,8 @@ Worker_Delete(PSSDEWORKER* __this)
             ZwClose(_this->CodeIntegrityProtectedKey);
             _this->CodeIntegrityProtectedKey = NULL;
         }
-        if (_this->CodeIntegrityProtectedKeyChangeEventHandle) {
+        if (_this->CodeIntegrityProtectedKeyChangeEventHandle)
+        {
             ObDereferenceObject(_this->CodeIntegrityProtectedKeyChangeEventObject);
             _this->CodeIntegrityProtectedKeyChangeEventObject = NULL;
 
@@ -85,10 +73,7 @@ Worker_Delete(PSSDEWORKER* __this)
 
         if (_this->CodeIntegrityWhqlSettingsValueInfo)
         {
-            ExFreePoolWithTag(
-                _this->CodeIntegrityWhqlSettingsValueInfo,
-                uTag
-            );
+            ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
             _this->CodeIntegrityWhqlSettingsValueInfo = NULL;
             _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
         }
@@ -97,7 +82,8 @@ Worker_Delete(PSSDEWORKER* __this)
             ZwClose(_this->CodeIntegrityPolicyKey);
             _this->CodeIntegrityPolicyKey = NULL;
         }
-        if (_this->CodeIntegrityPolicyKeyChangeEventHandle) {
+        if (_this->CodeIntegrityPolicyKeyChangeEventHandle)
+        {
             ObDereferenceObject(_this->CodeIntegrityPolicyKeyChangeEventObject);
             _this->CodeIntegrityPolicyKeyChangeEventObject = NULL;
 
@@ -105,14 +91,16 @@ Worker_Delete(PSSDEWORKER* __this)
             _this->CodeIntegrityPolicyKeyChangeEventHandle = NULL;
         }
 
-        if (_this->UnloadEventHandle) {
+        if (_this->UnloadEventHandle)
+        {
             ObDereferenceObject(_this->UnloadEventObject);
             _this->UnloadEventObject = NULL;
 
             ZwClose(_this->UnloadEventHandle);
             _this->UnloadEventHandle = NULL;
         }
-        if (_this->WorkerHandle) {
+        if (_this->WorkerHandle)
+        {
             _this->WorkerObject = NULL;
 
             _this->WorkerHandle = NULL;
@@ -124,10 +112,9 @@ Worker_Delete(PSSDEWORKER* __this)
 
     return Status;
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
-VOID Worker_Work(_In_ PSSDEWORKER* __this)
+VOID
+Worker_Work(_In_ PSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -154,69 +141,57 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
 
     while (1)
     {
-        Status = ZwQueryLicenseValue(
-            &gCiAcpCksName, 
-            &PolicyValueType, 
-            &CiAcpCks,
-            sizeof(CiAcpCks),
-            &ResultLength
-        );
-        if (!NT_SUCCESS(Status)) {
+        Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
+        if (!NT_SUCCESS(Status))
+        {
             break;
         }
-        if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG)) {
+        if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
+        {
             Status = STATUS_OBJECT_TYPE_MISMATCH;
             break;
         }
 
         if (CiAcpCks == 0)
         {
-            while (1) {
+            while (1)
+            {
                 Status = ZwQueryValueKey(
                     _this->ProductOptionsKey,
                     &gProductPolicyValueName,
                     KeyValuePartialInformation,
                     _this->ProductPolicyValueInfo,
                     _this->ProductPolicyValueInfoSize,
-                    &ResultLength
-                );
-                if (NT_SUCCESS(Status)) {
+                    &ResultLength);
+                if (NT_SUCCESS(Status))
+                {
                     break;
                 }
-                else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL) {
-#pragma warning (disable: 6387)
-                    ExFreePoolWithTag(
-                        _this->ProductPolicyValueInfo,
-                        uTag
-                    );
-#pragma warning (default: 6387)
-                    _this->ProductPolicyValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
-                        PagedPool,
-                        ResultLength,
-                        uTag
-                    );
-                    if (_this->ProductPolicyValueInfo) {
+                else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+                {
+                    ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
+                    _this->ProductPolicyValueInfo =
+                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                    if (_this->ProductPolicyValueInfo)
+                    {
                         _this->ProductPolicyValueInfoSize = ResultLength;
                     }
-                    else {
+                    else
+                    {
                         _this->ProductPolicyValueInfoSize = 0;
                         Status = STATUS_NO_MEMORY;
                         break;
                     }
                 }
-                else {
+                else
+                {
                     break;
                 }
             }
 
             ULONG uEdit = 1;
-#pragma warning (disable: 6011)
             Status = HandlePolicyBinary(
-                _this->ProductPolicyValueInfo->DataLength,
-                _this->ProductPolicyValueInfo->Data,
-                &uEdit
-            );
-#pragma warning (default: 6011)
+                _this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data, &uEdit);
             if (!NT_SUCCESS(Status))
             {
                 break;
@@ -226,112 +201,104 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
                 ArmCount++;
             }
 
-            Status = ExUpdateLicenseData(
-                _this->ProductPolicyValueInfo->DataLength,
-                _this->ProductPolicyValueInfo->Data
-            );
+            Status =
+                ExUpdateLicenseData(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data);
         }
 
-        while (1) {
+        while (1)
+        {
             Status = ZwQueryValueKey(
                 _this->CodeIntegrityProtectedKey,
                 &gCodeIntegrityLicensedValueName,
                 KeyValuePartialInformation,
                 _this->CodeIntegrityLicensedValueInfo,
                 _this->CodeIntegrityLicensedValueInfoSize,
-                &ResultLength
-            );
-            if (NT_SUCCESS(Status)) {
+                &ResultLength);
+            if (NT_SUCCESS(Status))
+            {
                 break;
             }
-            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL) {
-#pragma warning (disable: 6387)
-                ExFreePoolWithTag(
-                    _this->CodeIntegrityLicensedValueInfo,
-                    uTag
-                );
-#pragma warning (default: 6387)
-                _this->CodeIntegrityLicensedValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
-                    PagedPool,
-                    ResultLength,
-                    uTag
-                );
-                if (_this->CodeIntegrityLicensedValueInfo) {
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+            {
+                ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
+                _this->CodeIntegrityLicensedValueInfo =
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                if (_this->CodeIntegrityLicensedValueInfo)
+                {
                     _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
                 }
-                else {
+                else
+                {
                     _this->CodeIntegrityLicensedValueInfoSize = 0;
                     Status = STATUS_NO_MEMORY;
                     break;
                 }
             }
-            else {
+            else
+            {
                 break;
             }
         }
 
-        if (_this->CodeIntegrityLicensedValueInfo == NULL || 
-            _this->CodeIntegrityLicensedValueInfo->DataLength != sizeof(ULONG) || 
-            (*(PULONG)_this->CodeIntegrityLicensedValueInfo->Data) == 0) {
+        if (_this->CodeIntegrityLicensedValueInfo == NULL ||
+            _this->CodeIntegrityLicensedValueInfo->DataLength != sizeof(ULONG) ||
+            (*(PULONG)_this->CodeIntegrityLicensedValueInfo->Data) == 0)
+        {
             Status = ZwSetValueKey(
-                _this->CodeIntegrityProtectedKey, 
-                &gCodeIntegrityLicensedValueName, 
-                0, 
-                REG_DWORD, 
-                &CiLicensed, 
-                sizeof(ULONG)
-            );
+                _this->CodeIntegrityProtectedKey,
+                &gCodeIntegrityLicensedValueName,
+                0,
+                REG_DWORD,
+                &CiLicensed,
+                sizeof(ULONG));
         }
 
-        while (1) {
+        while (1)
+        {
             Status = ZwQueryValueKey(
                 _this->CodeIntegrityPolicyKey,
                 &gCodeIntegrityWhqlSettingsValueName,
                 KeyValuePartialInformation,
                 _this->CodeIntegrityWhqlSettingsValueInfo,
                 _this->CodeIntegrityWhqlSettingsValueInfoSize,
-                &ResultLength
-            );
-            if (NT_SUCCESS(Status)) {
+                &ResultLength);
+            if (NT_SUCCESS(Status))
+            {
                 break;
             }
-            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL) {
-#pragma warning (disable: 6387)
-                ExFreePoolWithTag(
-                    _this->CodeIntegrityWhqlSettingsValueInfo,
-                    uTag
-                );
-#pragma warning (default: 6387)
-                _this->CodeIntegrityWhqlSettingsValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
-                    PagedPool,
-                    ResultLength,
-                    uTag
-                );
-                if (_this->CodeIntegrityWhqlSettingsValueInfo) {
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+            {
+                ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
+                _this->CodeIntegrityWhqlSettingsValueInfo =
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                if (_this->CodeIntegrityWhqlSettingsValueInfo)
+                {
                     _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
                 }
-                else {
+                else
+                {
                     _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
                     Status = STATUS_NO_MEMORY;
                     break;
                 }
             }
-            else {
+            else
+            {
                 break;
             }
         }
 
-        if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL || 
-            _this->CodeIntegrityWhqlSettingsValueInfo->DataLength != sizeof(ULONG) || 
-            (*(PULONG)_this->CodeIntegrityWhqlSettingsValueInfo->Data) == 0) {
+        if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL ||
+            _this->CodeIntegrityWhqlSettingsValueInfo->DataLength != sizeof(ULONG) ||
+            (*(PULONG)_this->CodeIntegrityWhqlSettingsValueInfo->Data) == 0)
+        {
             Status = ZwSetValueKey(
                 _this->CodeIntegrityPolicyKey,
                 &gCodeIntegrityWhqlSettingsValueName,
                 0,
                 REG_DWORD,
                 &CiWhqlSettings,
-                sizeof(ULONG)
-            );
+                sizeof(ULONG));
         }
 
         Status = ZwNotifyChangeKey(
@@ -344,8 +311,7 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
             FALSE,
             NULL,
             0,
-            TRUE
-        );
+            TRUE);
         if (!NT_SUCCESS(Status))
         {
             break;
@@ -361,8 +327,7 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
             FALSE,
             NULL,
             0,
-            TRUE
-        );
+            TRUE);
         if (!NT_SUCCESS(Status))
         {
             break;
@@ -378,49 +343,35 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
             FALSE,
             NULL,
             0,
-            TRUE
-        );
+            TRUE);
         if (!NT_SUCCESS(Status))
         {
             break;
         }
 
-        if (objects && objectsCount) {
-            if (objectsCount > THREAD_WAIT_OBJECTS) {
-                waitBlocks = (PKWAIT_BLOCK)ExAllocatePoolWithTag(
-                    NonPagedPool,
-                    objectsCount * sizeof(KWAIT_BLOCK),
-                    uTag
-                );
+        if (objects && objectsCount)
+        {
+            if (objectsCount > THREAD_WAIT_OBJECTS)
+            {
+                waitBlocks =
+                    (PKWAIT_BLOCK)ExAllocatePoolWithTag(NonPagedPool, objectsCount * sizeof(KWAIT_BLOCK), uTag);
 
-                if (waitBlocks == NULL) {
+                if (waitBlocks == NULL)
+                {
                     Status = STATUS_NO_MEMORY;
                     break;
                 }
             }
         }
 
-        Status = KeWaitForMultipleObjects(
-            objectsCount,
-            objects,
-            WaitAny,
-            Executive,
-            KernelMode,
-            FALSE,
-            NULL,
-            waitBlocks
-        );
+        Status =
+            KeWaitForMultipleObjects(objectsCount, objects, WaitAny, Executive, KernelMode, FALSE, NULL, waitBlocks);
         if (Status != STATUS_WAIT_1)
         {
             break;
         }
 
-#pragma warning (disable: 6387)
-        ExFreePoolWithTag(
-            waitBlocks,
-            uTag
-        );
-#pragma warning (default: 6387)
+        ExFreePoolWithTag(waitBlocks, uTag);
     }
 
     Worker_Delete(__this);
@@ -431,11 +382,9 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
-NTSTATUS 
-Worker_MakeAndInitialize(PSSDEWORKER* __this)
+NTSTATUS
+Worker_MakeAndInitialize(PSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -450,25 +399,16 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         goto finalize;
     }
 
-    _this = (PSSDEWORKER)ExAllocatePoolWithTag(
-        PagedPool,
-        sizeof(SSDEWORKER),
-        uTag
-    );
-    if (_this == NULL) {
+    _this = (PSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(SSDEWORKER), uTag);
+    if (_this == NULL)
+    {
         Status = STATUS_NO_MEMORY;
         goto finalize;
     }
     *__this = _this;
 
-
     Status = ZwCreateEvent(
-        &(_this->ProductOptionsKeyChangeEventHandle),
-        EVENT_ALL_ACCESS,
-        NULL,
-        SynchronizationEvent,
-        FALSE
-    );
+        &(_this->ProductOptionsKeyChangeEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
@@ -479,21 +419,14 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         *ExEventObjectType,
         KernelMode,
         &(_this->ProductOptionsKeyChangeEventObject),
-        NULL
-    );
+        NULL);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
 
-
     Status = ZwCreateEvent(
-        &(_this->CodeIntegrityProtectedKeyChangeEventHandle),
-        EVENT_ALL_ACCESS,
-        NULL,
-        SynchronizationEvent,
-        FALSE
-    );
+        &(_this->CodeIntegrityProtectedKeyChangeEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
@@ -504,21 +437,14 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         *ExEventObjectType,
         KernelMode,
         &(_this->CodeIntegrityProtectedKeyChangeEventObject),
-        NULL
-    );
+        NULL);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
 
-
     Status = ZwCreateEvent(
-        &(_this->CodeIntegrityPolicyKeyChangeEventHandle),
-        EVENT_ALL_ACCESS,
-        NULL,
-        SynchronizationEvent,
-        FALSE
-    );
+        &(_this->CodeIntegrityPolicyKeyChangeEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
@@ -529,93 +455,45 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         *ExEventObjectType,
         KernelMode,
         &(_this->CodeIntegrityPolicyKeyChangeEventObject),
-        NULL
-    );
+        NULL);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
 
-
-    Status = ZwCreateEvent(
-        &(_this->UnloadEventHandle),
-        EVENT_ALL_ACCESS,
-        NULL,
-        SynchronizationEvent,
-        FALSE
-    );
+    Status = ZwCreateEvent(&(_this->UnloadEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
     Status = ObReferenceObjectByHandle(
-        _this->UnloadEventHandle,
-        EVENT_ALL_ACCESS,
-        *ExEventObjectType,
-        KernelMode,
-        &(_this->UnloadEventObject),
-        NULL
-    );
+        _this->UnloadEventHandle, EVENT_ALL_ACCESS, *ExEventObjectType, KernelMode, &(_this->UnloadEventObject), NULL);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
-
 
     OBJECT_ATTRIBUTES KeyAttribute;
-    InitializeObjectAttributes(
-        &KeyAttribute,
-        &gProductOptionsKeyName,
-        OBJ_CASE_INSENSITIVE,
-        NULL,
-        NULL
-    );
-    Status = ZwOpenKey(
-        &(_this->ProductOptionsKey),
-        KEY_READ,
-        &KeyAttribute
-    );
+    InitializeObjectAttributes(&KeyAttribute, &gProductOptionsKeyName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    Status = ZwOpenKey(&(_this->ProductOptionsKey), KEY_READ, &KeyAttribute);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
 
-
-    InitializeObjectAttributes(
-        &KeyAttribute,
-        &gCodeIntegrityProtectedKeyName,
-        OBJ_CASE_INSENSITIVE,
-        NULL,
-        NULL
-    );
-    Status = ZwOpenKey(
-        &(_this->CodeIntegrityProtectedKey),
-        KEY_READ,
-        &KeyAttribute
-    );
+    InitializeObjectAttributes(&KeyAttribute, &gCodeIntegrityProtectedKeyName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    Status = ZwOpenKey(&(_this->CodeIntegrityProtectedKey), KEY_READ, &KeyAttribute);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
 
-
-    InitializeObjectAttributes(
-        &KeyAttribute,
-        &gCodeIntegrityPolicyKeyName,
-        OBJ_CASE_INSENSITIVE,
-        NULL,
-        NULL
-    );
-    Status = ZwOpenKey(
-        &(_this->CodeIntegrityPolicyKey),
-        KEY_READ,
-        &KeyAttribute
-    );
+    InitializeObjectAttributes(&KeyAttribute, &gCodeIntegrityPolicyKeyName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    Status = ZwOpenKey(&(_this->CodeIntegrityPolicyKey), KEY_READ, &KeyAttribute);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
-
 
     ULONG ResultLength = 0;
     KEY_VALUE_PARTIAL_INFORMATION KeyInfo;
@@ -625,19 +503,13 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         KeyValuePartialInformation,
         &KeyInfo,
         sizeof(KeyInfo),
-        &ResultLength
-    );
-    if (Status != STATUS_BUFFER_OVERFLOW && 
-        Status != STATUS_BUFFER_TOO_SMALL && 
-        Status != STATUS_SUCCESS)
+        &ResultLength);
+    if (Status != STATUS_BUFFER_OVERFLOW && Status != STATUS_BUFFER_TOO_SMALL && Status != STATUS_SUCCESS)
     {
         goto finalize;
     }
-    _this->ProductPolicyValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
-        NonPagedPool,
-        ResultLength, 
-        uTag
-    );
+    _this->ProductPolicyValueInfo =
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
     if (_this->ProductPolicyValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -645,26 +517,19 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
     }
     _this->ProductPolicyValueInfoSize = ResultLength;
 
-
     Status = ZwQueryValueKey(
         _this->CodeIntegrityProtectedKey,
         &gCodeIntegrityLicensedValueName,
         KeyValuePartialInformation,
         &KeyInfo,
         sizeof(KeyInfo),
-        &ResultLength
-    );
-    if (Status != STATUS_BUFFER_OVERFLOW &&
-        Status != STATUS_BUFFER_TOO_SMALL &&
-        Status != STATUS_SUCCESS)
+        &ResultLength);
+    if (Status != STATUS_BUFFER_OVERFLOW && Status != STATUS_BUFFER_TOO_SMALL && Status != STATUS_SUCCESS)
     {
         goto finalize;
     }
-    _this->CodeIntegrityLicensedValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
-        NonPagedPool,
-        ResultLength,
-        uTag
-    );
+    _this->CodeIntegrityLicensedValueInfo =
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
     if (_this->CodeIntegrityLicensedValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -672,26 +537,19 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
     }
     _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
 
-
     Status = ZwQueryValueKey(
         _this->CodeIntegrityPolicyKey,
         &gCodeIntegrityWhqlSettingsValueName,
         KeyValuePartialInformation,
         &KeyInfo,
         sizeof(KeyInfo),
-        &ResultLength
-    );
-    if (Status != STATUS_BUFFER_OVERFLOW &&
-        Status != STATUS_BUFFER_TOO_SMALL &&
-        Status != STATUS_SUCCESS)
+        &ResultLength);
+    if (Status != STATUS_BUFFER_OVERFLOW && Status != STATUS_BUFFER_TOO_SMALL && Status != STATUS_SUCCESS)
     {
         goto finalize;
     }
-    _this->CodeIntegrityWhqlSettingsValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
-        NonPagedPool,
-        ResultLength,
-        uTag
-    );
+    _this->CodeIntegrityWhqlSettingsValueInfo =
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
     if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -699,72 +557,45 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
     }
     _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
 
-
     _this->pFunc = Worker_Work;
 
-
-    InitializeObjectAttributes(
-        &ThreadAttribute,
-        NULL,
-        OBJ_KERNEL_HANDLE,
-        NULL,
-        NULL
-    );
+    InitializeObjectAttributes(&ThreadAttribute, NULL, OBJ_KERNEL_HANDLE, NULL, NULL);
     Status = PsCreateSystemThread(
-        &(_this->WorkerHandle),
-        THREAD_ALL_ACCESS,
-        &ThreadAttribute,
-        NULL,
-        NULL,
-        _this->pFunc,
-        __this
-    );
+        &(_this->WorkerHandle), THREAD_ALL_ACCESS, &ThreadAttribute, NULL, NULL, _this->pFunc, __this);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
-
-
 
     Status = ObReferenceObjectByHandle(
-        _this->WorkerHandle,
-        THREAD_ALL_ACCESS,
-        *PsThreadType,
-        KernelMode,
-        &(_this->WorkerObject),
-        NULL
-    );
+        _this->WorkerHandle, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &(_this->WorkerObject), NULL);
     if (!NT_SUCCESS(Status))
     {
         goto finalize;
     }
-
 
     Status = STATUS_SUCCESS;
 
 finalize:
     if (!NT_SUCCESS(Status))
     {
-        if (_this) {
+        if (_this)
+        {
             Worker_Delete(__this);
         }
     }
     return Status;
 }
-#pragma code_seg ()
 
-#pragma code_seg ("INIT")
 NTSTATUS
-DriverEntry(
-    PDRIVER_OBJECT DriverObject,
-    PUNICODE_STRING RegistryPath
-)
+DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
     UNREFERENCED_PARAMETER(RegistryPath);
 
     NTSTATUS Status = STATUS_SUCCESS;
 
-    for (int n = 0; n <= IRP_MJ_MAXIMUM_FUNCTION; n++) {
+    for (int n = 0; n <= IRP_MJ_MAXIMUM_FUNCTION; n++)
+    {
         DriverObject->MajorFunction[n] = OnOther;
     }
 
@@ -785,71 +616,47 @@ DriverEntry(
 finalize:
     return Status;
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
-VOID OnUnload(PDRIVER_OBJECT DriverObject)
+VOID
+OnUnload(PDRIVER_OBJECT DriverObject)
 {
-    PAGED_CODE();      // keep the static analysis tools happy 
+    PAGED_CODE(); // keep the static analysis tools happy
 
     if (Worker)
     {
         PVOID WorkerObject = Worker->WorkerObject;
         HANDLE WorkerHandle = Worker->WorkerHandle;
-        KeSetEvent(
-            Worker->UnloadEventObject,
-            IO_NO_INCREMENT,
-            TRUE
-        );
-        KeWaitForSingleObject(
-            WorkerObject,
-            Executive,
-            KernelMode,
-            FALSE,
-            NULL
-        );
+        KeSetEvent(Worker->UnloadEventObject, IO_NO_INCREMENT, TRUE);
+        KeWaitForSingleObject(WorkerObject, Executive, KernelMode, FALSE, NULL);
         ObDereferenceObject(WorkerObject);
         ZwClose(WorkerHandle);
     }
 
     DestroyApiDevice(DriverObject);
 }
-#pragma code_seg ()
 
-#pragma code_seg ()
 FORCEINLINE
-NTSTATUS IrpDispatchDone(
-    PIRP Irp, 
-    NTSTATUS Status
-)
+NTSTATUS
+IrpDispatchDone(PIRP Irp, NTSTATUS Status)
 {
     Irp->IoStatus.Status = Status;
     Irp->IoStatus.Information = 0;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
     return Status;
 }
-#pragma code_seg ()
 
-#pragma code_seg ()
 FORCEINLINE
-NTSTATUS IrpDispatchDoneEx(
-    PIRP Irp,
-    NTSTATUS Status,
-    ULONG Information
-)
+NTSTATUS
+IrpDispatchDoneEx(PIRP Irp, NTSTATUS Status, ULONG Information)
 {
     Irp->IoStatus.Status = Status;
     Irp->IoStatus.Information = Information;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
     return Status;
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
-NTSTATUS OnCreate(
-    PDEVICE_OBJECT DeviceObject, 
-    PIRP Irp
-)
+NTSTATUS
+OnCreate(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     PAGED_CODE();
 
@@ -858,19 +665,13 @@ NTSTATUS OnCreate(
     PIO_STACK_LOCATION sl = IoGetCurrentIrpStackLocation(Irp);
     PFILE_OBJECT fileobj = sl->FileObject;
     PUNICODE_STRING filename = &(fileobj->FileName);
-    NTSTATUS status = filename->Length != 0
-        ? STATUS_INVALID_PARAMETER
-        : STATUS_SUCCESS;
+    NTSTATUS status = filename->Length != 0 ? STATUS_INVALID_PARAMETER : STATUS_SUCCESS;
 
     return IrpDispatchDone(Irp, status);
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
-NTSTATUS OnClose(
-    PDEVICE_OBJECT DeviceObject,
-    PIRP Irp
-)
+NTSTATUS
+OnClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     PAGED_CODE();
 
@@ -878,13 +679,9 @@ NTSTATUS OnClose(
 
     return IrpDispatchDone(Irp, STATUS_SUCCESS);
 }
-#pragma code_seg ()
 
-#pragma code_seg ()
-NTSTATUS OnDeviceControl(
-    PDEVICE_OBJECT DeviceObject,
-    PIRP Irp
-)
+NTSTATUS
+OnDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
 
@@ -895,7 +692,8 @@ NTSTATUS OnDeviceControl(
     ULONG outlen = sl->Parameters.DeviceIoControl.OutputBufferLength;
     NTSTATUS status;
 
-    switch (sl->Parameters.DeviceIoControl.IoControlCode) {
+    switch (sl->Parameters.DeviceIoControl.IoControlCode)
+    {
     case IOCTL_SELFSIGN_GET_VERSION: {
         status = OnApiGetInfo(buf, inlen, outlen, &numret);
         break;
@@ -907,50 +705,40 @@ NTSTATUS OnDeviceControl(
     }
     return IrpDispatchDoneEx(Irp, status, numret);
 }
-#pragma code_seg ()
 
-#pragma code_seg ()
-NTSTATUS OnOther(
-    PDEVICE_OBJECT DeviceObject,
-    PIRP Irp
-)
+NTSTATUS
+OnOther(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
 
     return IrpDispatchDone(Irp, STATUS_INVALID_DEVICE_REQUEST);
 }
-#pragma code_seg ()
 
 /*  ************************************************************************  */
 /*  API Support  */
 
-#define API_DEVICE_NAME     L"\\Device\\"   SSDE_DEVICE_NAME
-#define API_LINK_NAME       L"\\??\\"       SSDE_DEVICE_NAME
+#define API_DEVICE_NAME L"\\Device\\" SSDE_DEVICE_NAME
+#define API_LINK_NAME L"\\??\\" SSDE_DEVICE_NAME
 
 PDEVICE_OBJECT ApiDevice = NULL;
 
-#pragma code_seg ("INIT")
-NTSTATUS CreateApiDevice(PDRIVER_OBJECT DriverObject)
+NTSTATUS
+CreateApiDevice(PDRIVER_OBJECT DriverObject)
 {
     UNICODE_STRING devname;
     RtlInitUnicodeString(&devname, API_DEVICE_NAME);
 
     PDEVICE_OBJECT devobj;
-    NTSTATUS status = IoCreateDevice(
-        DriverObject,
-        0,
-        &devname,
-        FILE_DEVICE_UNKNOWN,
-        0,
-        TRUE,
-        &devobj);
-    if (NT_SUCCESS(status)) {
+    NTSTATUS status = IoCreateDevice(DriverObject, 0, &devname, FILE_DEVICE_UNKNOWN, 0, TRUE, &devobj);
+    if (NT_SUCCESS(status))
+    {
         UNICODE_STRING linkname;
 
         RtlInitUnicodeString(&linkname, API_LINK_NAME);
 
         status = IoCreateSymbolicLink(&linkname, &devname);
-        if (NT_SUCCESS(status)) {
+        if (NT_SUCCESS(status))
+        {
             ApiDevice = devobj;
             return STATUS_SUCCESS;
         }
@@ -959,16 +747,16 @@ NTSTATUS CreateApiDevice(PDRIVER_OBJECT DriverObject)
     }
     return status;
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
-VOID DestroyApiDevice(PDRIVER_OBJECT DriverObject)
+VOID
+DestroyApiDevice(PDRIVER_OBJECT DriverObject)
 {
     PAGED_CODE();
 
     UNREFERENCED_PARAMETER(DriverObject);
 
-    if (ApiDevice == NULL) return;
+    if (ApiDevice == NULL)
+        return;
 
     UNICODE_STRING linkname;
     RtlInitUnicodeString(&linkname, API_LINK_NAME);
@@ -976,25 +764,20 @@ VOID DestroyApiDevice(PDRIVER_OBJECT DriverObject)
 
     IoDeleteDevice(ApiDevice);
 }
-#pragma code_seg ()
 
-#pragma code_seg ("PAGE")
 NTSTATUS
-OnApiGetInfo(
-    PVOID Buffer,
-    ULONG InLen,
-    ULONG OutLen,
-    ULONG* NumRet)
+OnApiGetInfo(PVOID Buffer, ULONG InLen, ULONG OutLen, ULONG *NumRet)
 {
     PAGED_CODE();
 
-    SSDE_API_INFO* pver;
+    SSDE_API_INFO *pver;
 
-    if (InLen != 0 || OutLen != sizeof(*pver) || Buffer == NULL) {
+    if (InLen != 0 || OutLen != sizeof(*pver) || Buffer == NULL)
+    {
         return STATUS_INVALID_PARAMETER;
     }
 
-    pver = (SSDE_API_INFO*)Buffer;
+    pver = (SSDE_API_INFO *)Buffer;
     pver->Minor = SSDE_API_MINOR_VERSION;
     pver->Major = SSDE_API_MAJOR_VERSION;
     pver->ArmCount = ArmCount;
@@ -1004,4 +787,3 @@ OnApiGetInfo(
     *NumRet = sizeof(*pver);
     return STATUS_SUCCESS;
 }
-#pragma code_seg ()
