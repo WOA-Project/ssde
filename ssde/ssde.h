@@ -7,14 +7,21 @@ typedef struct _SSDEWORKER {
     PKSTART_ROUTINE                 pFunc;
     HANDLE                          UnloadEventHandle;
     PKEVENT                         UnloadEventObject;
+
     HANDLE                          ProductOptionsKeyChangeEventHandle;
     PKEVENT                         ProductOptionsKeyChangeEventObject;
     HANDLE                          ProductOptionsKey;
     PKEY_VALUE_PARTIAL_INFORMATION  ProductPolicyValueInfo;
     ULONG                           ProductPolicyValueInfoSize;
+
+    HANDLE                          CodeIntegrityProtectedKeyChangeEventHandle;
+    PKEVENT                         CodeIntegrityProtectedKeyChangeEventObject;
     HANDLE                          CodeIntegrityProtectedKey;
     PKEY_VALUE_PARTIAL_INFORMATION  CodeIntegrityLicensedValueInfo;
     ULONG                           CodeIntegrityLicensedValueInfoSize;
+
+    HANDLE                          CodeIntegrityPolicyKeyChangeEventHandle;
+    PKEVENT                         CodeIntegrityPolicyKeyChangeEventObject;
     HANDLE                          CodeIntegrityPolicyKey;
     PKEY_VALUE_PARTIAL_INFORMATION  CodeIntegrityWhqlSettingsValueInfo;
     ULONG                           CodeIntegrityWhqlSettingsValueInfoSize;
