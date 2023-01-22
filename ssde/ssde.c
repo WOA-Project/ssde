@@ -397,6 +397,9 @@ Worker_Work(_In_ PSSDEWORKER *__this)
             KeWaitForMultipleObjects(objectsCount, objects, WaitAny, Executive, KernelMode, FALSE, NULL, waitBlocks);
         if (Status != STATUS_WAIT_1 && Status != STATUS_WAIT_2 && Status != STATUS_WAIT_3)
         {
+            EnsureCustomKernelSignersIsLicensed(__this);
+            EnsureCodeIntegrityProtectedIsLicensed(__this);
+            EnsureCodeIntegrityWhqlSettingsIsSet(__this);
             break;
         }
 
