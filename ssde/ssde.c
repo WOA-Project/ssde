@@ -138,8 +138,8 @@ VOID Worker_Work(_In_ PSSDEWORKER* __this)
                         uTag
                     );
 #pragma warning (default: 6387)
-                    _this->ProductPolicyValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePool2(
-                        POOL_FLAG_PAGED,
+                    _this->ProductPolicyValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
+                        PagedPool,
                         ResultLength,
                         uTag
                     );
@@ -240,8 +240,8 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
         goto finalize;
     }
 
-    _this = (PSSDEWORKER)ExAllocatePool2(
-        POOL_FLAG_PAGED,
+    _this = (PSSDEWORKER)ExAllocatePoolWithTag(
+        PagedPool,
         sizeof(SSDEWORKER),
         uTag
     );
@@ -337,8 +337,8 @@ Worker_MakeAndInitialize(PSSDEWORKER* __this)
     {
         goto finalize;
     }
-    _this->ProductPolicyValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePool2(
-        POOL_FLAG_NON_PAGED,
+    _this->ProductPolicyValueInfo = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(
+        NonPagedPool,
         ResultLength, 
         uTag
     );
