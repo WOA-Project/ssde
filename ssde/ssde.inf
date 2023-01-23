@@ -7,7 +7,7 @@ Signature   = "$WINDOWS NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer = ; TODO: set DriverVer in stampinf property pages
+DriverVer = 01/22/2023,23.53.5.853
 CatalogFile = ssde.cat
 PnPLockdown = 1
 
@@ -27,7 +27,7 @@ ExcludeFromSelect = *
 %ManufacturerName% = Standard, NT$ARCH$
 
 [Standard.NT$ARCH$]
-%DeviceDesc% = SSDE_Inst, ACPI\SSDE
+%DeviceDesc% = SSDE_Inst, Root\SSDE
 
 [SSDE_Inst.NT]
 Copyfiles = SSDECopyFiles
@@ -39,8 +39,9 @@ Addreg = SSDEACL, SSDE_OS_Configuration
 HKR,,Security,,"D:P(A;;GA;;;BA)(A;;GA;;;SY)" ;built in admin and local sys access
 
 [SSDE_OS_Configuration]
-HKLM, "SYSTEM\CurrentControlSet\Control\CI\Policy",    "WhqlSettings", %REG_DWORD%, 0x00000001
-HKLM, "SYSTEM\CurrentControlSet\Control\CI\Protected", "Licensed",     %REG_DWORD%, 0x00000001
+HKLM, "SYSTEM\CurrentControlSet\Control\CI\Policy",    "WhqlSettings",     %REG_DWORD%, 0x00000001
+HKLM, "SYSTEM\CurrentControlSet\Control\CI\Protected", "Licensed",         %REG_DWORD%, 0x00000001
+HKLM, "SYSTEM\CurrentControlSet\Control\SecureBoot",   "AvailableUpdates", %REG_DWORD%, 0x00000000 ; Workaround for Mu Memory Protection Support Bug
 
 [SSDECopyFiles]
 ssde.sys
