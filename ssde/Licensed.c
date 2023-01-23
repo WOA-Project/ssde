@@ -148,7 +148,9 @@ LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
             _this->CodeIntegrityProtectedKey, &gCodeIntegrityLicensedValueName, REG_DWORD, &Licensed, sizeof(Licensed));
         if (!NT_SUCCESS(Status))
         {
-            break;
+            //break;
+            Status = STATUS_SUCCESS;
+            Licensed = 1;
         }
 
         if (Licensed == 0)

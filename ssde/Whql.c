@@ -147,7 +147,9 @@ WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
             _this->CodeIntegrityPolicyKey, &gCodeIntegrityWhqlSettingsValueName, REG_DWORD, &Whql, sizeof(Whql));
         if (!NT_SUCCESS(Status))
         {
-            break;
+            // break;
+            Status = STATUS_SUCCESS;
+            Whql = 1;
         }
 
         if (Whql == 0)
