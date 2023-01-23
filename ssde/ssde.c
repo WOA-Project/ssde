@@ -38,15 +38,23 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
     PUCHAR EndPtr = lpBytes + cbBytes;
     PPPBinaryValue pVal;
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     if (cbBytes < sizeof(PPBinaryHeader) || cbBytes != pHeader->TotalSize ||
         cbBytes != sizeof(PPBinaryHeader) + sizeof(ULONG) + pHeader->DataSize)
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
         return 0xC0000004L;
     }
 
     EndPtr -= sizeof(ULONG);
     if (*(PULONG)EndPtr != 0x45) // Product policy end-mark
+    {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
         return STATUS_INVALID_PARAMETER;
+    }
 
     for (pVal = (PPPBinaryValue)(pHeader + 1); (PUCHAR)pVal + sizeof(PPBinaryValue) < EndPtr;
          pVal = (PPPBinaryValue)((PUCHAR)pVal + pVal->TotalSize))
@@ -55,13 +63,21 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
         PVOID pValData;
 
         if (pVal->NameSize % 2 != 0)
+        {
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
             return STATUS_INVALID_PARAMETER;
+        }
 
         pValName = (PWSTR)(pVal + 1);
         pValData = (PUCHAR)pValName + pVal->NameSize;
 
         if ((PUCHAR)pValData + pVal->DataSize > EndPtr)
+        {
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
             return STATUS_INVALID_PARAMETER;
+        }
 
         if (AllowConfigurablePolicyCustomKernelSignerSet == FALSE &&
             _wcsnicmp(pValName, L"CodeIntegrity-AllowConfigurablePolicy-CustomKernelSigners", pVal->NameSize / 2) == 0)
@@ -82,10 +98,14 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
             }
             else
             {
+                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
                 return STATUS_INVALID_PARAMETER;
             }
         }
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 
     return 0;
 }
