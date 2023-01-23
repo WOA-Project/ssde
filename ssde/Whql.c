@@ -23,8 +23,7 @@ Environment:
 #    pragma alloc_text(PAGE, WhqlWorker_MakeAndInitialize)
 #endif
 
-UNICODE_STRING gCodeIntegrityPolicyKeyName =
-    RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_PROTECTED_STR);
+UNICODE_STRING gCodeIntegrityPolicyKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_POLICY_STR);
 
 UNICODE_STRING gCodeIntegrityWhqlSettingsValueName = RTL_CONSTANT_STRING(CODEINTEGRITY_WHQL_SETTINGS_STR);
 
@@ -34,6 +33,8 @@ NTSTATUS
 WhqlWorker_Delete(PWHQLSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     ULONG uTag = 'ssde';
@@ -79,6 +80,8 @@ WhqlWorker_Delete(PWHQLSSDEWORKER *__this)
         *__this = NULL;
     }
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return Status;
 }
 
@@ -93,6 +96,8 @@ WhqlZwQueryValueKey2(
     PKEY_VALUE_PARTIAL_INFORMATION pinfo;
     NTSTATUS status;
     ULONG len, reslen;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     len = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + DataSize;
 
@@ -113,6 +118,8 @@ WhqlZwQueryValueKey2(
 
     ExFreePool(pinfo);
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return status;
 }
 
@@ -120,6 +127,8 @@ VOID
 WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     PWHQLSSDEWORKER _this = *__this;
@@ -216,6 +225,8 @@ WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
 
     WhqlWorker_Delete(__this);
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
 
@@ -223,6 +234,8 @@ NTSTATUS
 WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     ULONG uTag = 'ssde';
@@ -330,18 +343,31 @@ finalize:
             WhqlWorker_Delete(__this);
         }
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return Status;
 }
 
 NTSTATUS
 WhqlInitializeWorker()
 {
-    return WhqlWorker_MakeAndInitialize(&WhqlWorker);
+    NTSTATUS status;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    status = WhqlWorker_MakeAndInitialize(&WhqlWorker);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+    return status;
 }
 
 VOID
 WhqlUninitializeWorker()
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     if (WhqlWorker)
     {
         PVOID WorkerObject = WhqlWorker->WorkerObject;
@@ -351,4 +377,6 @@ WhqlUninitializeWorker()
         ObDereferenceObject(WorkerObject);
         ZwClose(WorkerHandle);
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 }

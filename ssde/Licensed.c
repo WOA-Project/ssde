@@ -35,6 +35,8 @@ LicensedWorker_Delete(PLICENSEDSSDEWORKER *__this)
 {
     PAGED_CODE();
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     NTSTATUS Status = STATUS_SUCCESS;
     ULONG uTag = 'ssde';
     PLICENSEDSSDEWORKER _this = *__this;
@@ -79,6 +81,8 @@ LicensedWorker_Delete(PLICENSEDSSDEWORKER *__this)
         *__this = NULL;
     }
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return Status;
 }
 
@@ -93,6 +97,8 @@ LicensedZwQueryValueKey2(
     PKEY_VALUE_PARTIAL_INFORMATION pinfo;
     NTSTATUS status;
     ULONG len, reslen;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     len = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + DataSize;
 
@@ -113,6 +119,8 @@ LicensedZwQueryValueKey2(
 
     ExFreePool(pinfo);
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return status;
 }
 
@@ -120,6 +128,8 @@ VOID
 LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     PLICENSEDSSDEWORKER _this = *__this;
@@ -216,6 +226,8 @@ LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
 
     LicensedWorker_Delete(__this);
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
 
@@ -223,6 +235,8 @@ NTSTATUS
 LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     ULONG uTag = 'ssde';
@@ -330,18 +344,31 @@ finalize:
             LicensedWorker_Delete(__this);
         }
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return Status;
 }
 
 NTSTATUS
 LicensedInitializeWorker()
 {
-    return LicensedWorker_MakeAndInitialize(&LicensedWorker);
+    NTSTATUS status;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    status = LicensedWorker_MakeAndInitialize(&LicensedWorker);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+    return status;
 }
 
 VOID
 LicensedUninitializeWorker()
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     if (LicensedWorker)
     {
         PVOID WorkerObject = LicensedWorker->WorkerObject;
@@ -351,4 +378,6 @@ LicensedUninitializeWorker()
         ObDereferenceObject(WorkerObject);
         ZwClose(WorkerHandle);
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 }

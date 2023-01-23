@@ -97,6 +97,8 @@ Worker_Delete(PSSDEWORKER *__this)
 {
     PAGED_CODE();
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     NTSTATUS Status = STATUS_SUCCESS;
     ULONG uTag = 'ssde';
     PSSDEWORKER _this = *__this;
@@ -141,6 +143,8 @@ Worker_Delete(PSSDEWORKER *__this)
         *__this = NULL;
     }
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return Status;
 }
 
@@ -148,6 +152,8 @@ VOID
 Worker_Work(_In_ PSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     PSSDEWORKER _this = *__this;
@@ -252,6 +258,8 @@ Worker_Work(_In_ PSSDEWORKER *__this)
 
     Worker_Delete(__this);
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
 
@@ -259,6 +267,8 @@ NTSTATUS
 Worker_MakeAndInitialize(PSSDEWORKER *__this)
 {
     PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
     ULONG uTag = 'ssde';
@@ -366,18 +376,31 @@ finalize:
             Worker_Delete(__this);
         }
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
     return Status;
 }
 
 NTSTATUS
 InitializeWorker()
 {
-    return Worker_MakeAndInitialize(&Worker);
+    NTSTATUS status;
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    status = Worker_MakeAndInitialize(&Worker);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+    return status;
 }
 
 VOID
 UninitializeWorker()
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     if (Worker)
     {
         PVOID WorkerObject = Worker->WorkerObject;
@@ -387,4 +410,6 @@ UninitializeWorker()
         ObDereferenceObject(WorkerObject);
         ZwClose(WorkerHandle);
     }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 }
