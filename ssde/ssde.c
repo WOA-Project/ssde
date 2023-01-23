@@ -172,12 +172,15 @@ Worker_Work(_In_ PSSDEWORKER *__this)
         Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
         if (!NT_SUCCESS(Status))
         {
-            break;
+            //break;
+            Status = STATUS_SUCCESS;
+            CiAcpCks = 1;
         }
         if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
         {
-            Status = STATUS_OBJECT_TYPE_MISMATCH;
-            break;
+            //Status = STATUS_OBJECT_TYPE_MISMATCH;
+            //break;
+            CiAcpCks = 1;
         }
 
         if (CiAcpCks == 0)
