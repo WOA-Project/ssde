@@ -224,7 +224,7 @@ Worker_Work(_In_ PSSDEWORKER *__this)
                     ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
 #pragma warning(default : 6387)
                     _this->ProductPolicyValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolZero(PagedPool, ResultLength, uTag);
+                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
                     if (_this->ProductPolicyValueInfo)
                     {
                         _this->ProductPolicyValueInfoSize = ResultLength;
@@ -304,7 +304,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         goto finalize;
     }
 
-    _this = (PSSDEWORKER)ExAllocatePoolZero(PagedPool, sizeof(SSDEWORKER), uTag);
+    _this = (PSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(SSDEWORKER), uTag);
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -364,7 +364,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         goto finalize;
     }
     _this->ProductPolicyValueInfo =
-        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolZero(NonPagedPool, ResultLength, uTag);
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
     if (_this->ProductPolicyValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;

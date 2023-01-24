@@ -85,6 +85,27 @@ Return Value:
         return status;
     }
 
+    status = InitializeWorker();
+    if (!NT_SUCCESS(status))
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "InitializeWorker failed %!STATUS!", status);
+        return status;
+    }
+
+    status = LicensedInitializeWorker();
+    if (!NT_SUCCESS(status))
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "LicensedInitializeWorker failed %!STATUS!", status);
+        return status;
+    }
+
+    status = WhqlInitializeWorker();
+    if (!NT_SUCCESS(status))
+    {
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "WhqlInitializeWorker failed %!STATUS!", status);
+        return status;
+    }
+
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 
     return status;
@@ -119,28 +140,6 @@ Return Value:
     PAGED_CODE();
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
-
-    status = InitializeWorker();
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "InitializeWorker failed %!STATUS!", status);
-        return status;
-    }
-
-    status = LicensedInitializeWorker();
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "LicensedInitializeWorker failed %!STATUS!", status);
-        return status;
-    }
-
-    status = WhqlInitializeWorker();
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "WhqlInitializeWorker failed %!STATUS!", status);
-        return status;
-    }
-
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 

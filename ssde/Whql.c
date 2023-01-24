@@ -101,7 +101,7 @@ WhqlZwQueryValueKey2(
 
     len = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + DataSize;
 
-    pinfo = ExAllocatePoolZero(NonPagedPool, len, 'ssde');
+    pinfo = ExAllocatePoolWithTag(NonPagedPool, len, 'ssde');
 
     status = ZwQueryValueKey(KeyHandle, ValueName, KeyValuePartialInformation, pinfo, len, &reslen);
 
@@ -173,7 +173,7 @@ WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
                     ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
 #pragma warning(default : 6387)
                     _this->CodeIntegrityWhqlSettingsValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolZero(PagedPool, ResultLength, uTag);
+                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
                     if (_this->CodeIntegrityWhqlSettingsValueInfo)
                     {
                         _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
@@ -250,7 +250,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         goto finalize;
     }
 
-    _this = (PWHQLSSDEWORKER)ExAllocatePoolZero(PagedPool, sizeof(WHQLSSDEWORKER), uTag);
+    _this = (PWHQLSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(WHQLSSDEWORKER), uTag);
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -310,7 +310,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         goto finalize;
     }
     _this->CodeIntegrityWhqlSettingsValueInfo =
-        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolZero(NonPagedPool, ResultLength, uTag);
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
     if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;

@@ -5,8 +5,6 @@ VisualStudioVersion = 17.4.32916.344
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssde", "ssde\ssde.vcxproj", "{05CD1E2E-A363-4911-8C6E-65470D5FB683}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssde_enable", "ssde_enable\ssde_enable.vcxproj", "{B64FEE5E-8358-40D0-AAF3-39117A41C914}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -19,10 +17,6 @@ Global
 		{05CD1E2E-A363-4911-8C6E-65470D5FB683}.Release|ARM64.ActiveCfg = Release|ARM64
 		{05CD1E2E-A363-4911-8C6E-65470D5FB683}.Release|ARM64.Build.0 = Release|ARM64
 		{05CD1E2E-A363-4911-8C6E-65470D5FB683}.Release|ARM64.Deploy.0 = Release|ARM64
-		{B64FEE5E-8358-40D0-AAF3-39117A41C914}.Debug|ARM64.ActiveCfg = Debug|ARM64
-		{B64FEE5E-8358-40D0-AAF3-39117A41C914}.Debug|ARM64.Build.0 = Debug|ARM64
-		{B64FEE5E-8358-40D0-AAF3-39117A41C914}.Release|ARM64.ActiveCfg = Release|ARM64
-		{B64FEE5E-8358-40D0-AAF3-39117A41C914}.Release|ARM64.Build.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -102,7 +102,7 @@ LicensedZwQueryValueKey2(
 
     len = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + DataSize;
 
-    pinfo = ExAllocatePoolZero(NonPagedPool, len, 'ssde');
+    pinfo = ExAllocatePoolWithTag(NonPagedPool, len, 'ssde');
 
     status = ZwQueryValueKey(KeyHandle, ValueName, KeyValuePartialInformation, pinfo, len, &reslen);
 
@@ -174,7 +174,7 @@ LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
                     ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
 #pragma warning(default : 6387)
                     _this->CodeIntegrityLicensedValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolZero(PagedPool, ResultLength, uTag);
+                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
                     if (_this->CodeIntegrityLicensedValueInfo)
                     {
                         _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
@@ -251,7 +251,7 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
         goto finalize;
     }
 
-    _this = (PLICENSEDSSDEWORKER)ExAllocatePoolZero(PagedPool, sizeof(LICENSEDSSDEWORKER), uTag);
+    _this = (PLICENSEDSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(LICENSEDSSDEWORKER), uTag);
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -311,7 +311,7 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
         goto finalize;
     }
     _this->CodeIntegrityLicensedValueInfo =
-        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolZero(NonPagedPool, ResultLength, uTag);
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
     if (_this->CodeIntegrityLicensedValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
