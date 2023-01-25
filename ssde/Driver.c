@@ -132,7 +132,7 @@ Return Value:
 
 --*/
 {
-    NTSTATUS status;
+    NTSTATUS status = STATUS_SUCCESS;
 
     UNREFERENCED_PARAMETER(Driver);
     UNREFERENCED_PARAMETER(DeviceInit);
