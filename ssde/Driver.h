@@ -32,8 +32,12 @@ EXTERN_C_START
 //
 
 DRIVER_INITIALIZE DriverEntry;
-EVT_WDF_DRIVER_DEVICE_ADD ssdeEvtDeviceAdd;
-EVT_WDF_DRIVER_UNLOAD ssdeEvtUnload;
-EVT_WDF_OBJECT_CONTEXT_CLEANUP ssdeEvtDriverContextCleanup;
+
+__drv_dispatchType(IRP_MJ_CREATE) DRIVER_DISPATCH_PAGED OnCreate;
+__drv_dispatchType(IRP_MJ_CLOSE) DRIVER_DISPATCH_PAGED OnClose;
+__drv_dispatchType(IRP_MJ_DEVICE_CONTROL) DRIVER_DISPATCH OnDeviceControl;
+__drv_dispatchType_other DRIVER_DISPATCH OnOther;
+
+DRIVER_UNLOAD OnUnload;
 
 EXTERN_C_END

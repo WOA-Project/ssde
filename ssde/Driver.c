@@ -19,9 +19,9 @@ Environment:
 
 #ifdef ALLOC_PRAGMA
 #    pragma alloc_text(INIT, DriverEntry)
-#    pragma alloc_text(PAGE, ssdeEvtDeviceAdd)
-#    pragma alloc_text(PAGE, ssdeEvtUnload)
-#    pragma alloc_text(PAGE, ssdeEvtDriverContextCleanup)
+#    pragma alloc_text(PAGE, OnCreate)
+#    pragma alloc_text(PAGE, OnUnload)
+#    pragma alloc_text(PAGE, OnClose)
 #endif
 
 NTSTATUS
@@ -52,11 +52,7 @@ Return Value:
 
 --*/
 {
-    WDF_DRIVER_CONFIG config;
     NTSTATUS status;
-    WDF_OBJECT_ATTRIBUTES attributes;
-
-    ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 
     //
     // Initialize WPP Tracing
@@ -65,25 +61,15 @@ Return Value:
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
-    //
-    // Register a cleanup callback so that we can call WPP_CLEANUP when
-    // the framework driver object is deleted during driver unload.
-    //
-    WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-    attributes.EvtCleanupCallback = ssdeEvtDriverContextCleanup;
-
-    WDF_DRIVER_CONFIG_INIT(&config, ssdeEvtDeviceAdd);
-
-    config.EvtDriverUnload = ssdeEvtUnload;
-
-    status = WdfDriverCreate(DriverObject, RegistryPath, &attributes, &config, WDF_NO_HANDLE);
-
-    if (!NT_SUCCESS(status))
-    {
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "WdfDriverCreate failed %!STATUS!", status);
-        WPP_CLEANUP(DriverObject);
-        return status;
+    for (int n = 0; n <= IRP_MJ_MAXIMUM_FUNCTION; n++) {
+        DriverObject->MajorFunction[n] = OnOther;
     }
+
+    DriverObject->MajorFunction[IRP_MJ_CREATE] = OnCreate;
+    DriverObject->MajorFunction[IRP_MJ_CLOSE] = OnClose;
+    DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = OnDeviceControl;
+
+    DriverObject->DriverUnload = OnUnload;
 
     status = InitializeWorker();
     if (!NT_SUCCESS(status))
@@ -111,70 +97,64 @@ Return Value:
     return status;
 }
 
-NTSTATUS
-ssdeEvtDeviceAdd(_In_ WDFDRIVER Driver, _Inout_ PWDFDEVICE_INIT DeviceInit)
-/*++
-Routine Description:
-
-    EvtDeviceAdd is called by the framework in response to AddDevice
-    call from the PnP manager. We create and initialize a device object to
-    represent a new instance of the device.
-
-Arguments:
-
-    Driver - Handle to a framework driver object created in DriverEntry
-
-    DeviceInit - Pointer to a framework-allocated WDFDEVICE_INIT structure.
-
-Return Value:
-
-    NTSTATUS
-
---*/
+VOID OnUnload(PDRIVER_OBJECT DriverObject)
 {
-    NTSTATUS status = STATUS_SUCCESS;
-
-    UNREFERENCED_PARAMETER(Driver);
-    UNREFERENCED_PARAMETER(DeviceInit);
-
-    PAGED_CODE();
-
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
-
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
-
-    return status;
-}
-
-VOID
-ssdeEvtUnload(_In_ WDFDRIVER Driver)
-{
-    UNREFERENCED_PARAMETER(Driver);
+    UNREFERENCED_PARAMETER(DriverObject);
 
     UninitializeWorker();
     LicensedUninitializeWorker();
     WhqlUninitializeWorker();
 }
 
-VOID
-ssdeEvtDriverContextCleanup(_In_ WDFOBJECT DriverObject)
-/*++
-Routine Description:
-
-    Free all the resources allocated in DriverEntry.
-
-Arguments:
-
-    DriverObject - handle to a WDF Driver object.
-
-Return Value:
-
-    VOID.
-
---*/
+FORCEINLINE
+NTSTATUS IrpDispatchDone(
+    PIRP Irp, 
+    NTSTATUS Status
+)
 {
-    UNREFERENCED_PARAMETER(DriverObject);
+    Irp->IoStatus.Status = Status;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return Status;
+}
 
+FORCEINLINE
+NTSTATUS IrpDispatchDoneEx(
+    PIRP Irp,
+    NTSTATUS Status,
+    ULONG Information
+)
+{
+    Irp->IoStatus.Status = Status;
+    Irp->IoStatus.Information = Information;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return Status;
+}
+
+NTSTATUS OnCreate(
+    PDEVICE_OBJECT DeviceObject, 
+    PIRP Irp
+)
+{
+    PAGED_CODE();
+
+    UNREFERENCED_PARAMETER(DeviceObject);
+
+    PIO_STACK_LOCATION sl = IoGetCurrentIrpStackLocation(Irp);
+    PFILE_OBJECT fileobj = sl->FileObject;
+    PUNICODE_STRING filename = &(fileobj->FileName);
+    NTSTATUS status = filename->Length != 0
+        ? STATUS_INVALID_PARAMETER
+        : STATUS_SUCCESS;
+
+    return IrpDispatchDone(Irp, status);
+}
+
+NTSTATUS OnClose(
+    PDEVICE_OBJECT DeviceObject,
+    PIRP Irp
+)
+{
     PAGED_CODE();
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
@@ -182,5 +162,27 @@ Return Value:
     //
     // Stop WPP Tracing
     //
-    WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)DriverObject));
+    WPP_CLEANUP(DeviceObject->DriverObject);
+
+    return IrpDispatchDone(Irp, STATUS_SUCCESS);
+}
+
+NTSTATUS OnDeviceControl(
+    PDEVICE_OBJECT DeviceObject,
+    PIRP Irp
+)
+{
+    UNREFERENCED_PARAMETER(DeviceObject);
+
+    return IrpDispatchDoneEx(Irp, STATUS_INVALID_PARAMETER, 0);
+}
+
+NTSTATUS OnOther(
+    PDEVICE_OBJECT DeviceObject,
+    PIRP Irp
+)
+{
+    UNREFERENCED_PARAMETER(DeviceObject);
+
+    return IrpDispatchDone(Irp, STATUS_INVALID_DEVICE_REQUEST);
 }
