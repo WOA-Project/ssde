@@ -193,6 +193,7 @@ EnsureCksIsLicensed(_In_ PSSDEWORKER *__this)
     Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwQueryLicenseValue failed: %!STATUS!, marking as success / first boot", Status);
         // break;
         Status = STATUS_SUCCESS;
         CiAcpCks = 1;

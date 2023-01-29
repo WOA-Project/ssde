@@ -267,6 +267,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExAllocatePoolWithTag failed: %!STATUS!", Status);
         goto finalize;
     }
     *__this = _this;
@@ -275,6 +276,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         &(_this->CodeIntegrityPolicyKeyChangeEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwCreateEvent failed: %!STATUS!", Status);
         goto finalize;
     }
     Status = ObReferenceObjectByHandle(
@@ -286,18 +288,21 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         NULL);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ObReferenceObjectByHandle failed: %!STATUS!", Status);
         goto finalize;
     }
 
     Status = ZwCreateEvent(&(_this->UnloadEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwCreateEvent failed: %!STATUS!", Status);
         goto finalize;
     }
     Status = ObReferenceObjectByHandle(
         _this->UnloadEventHandle, EVENT_ALL_ACCESS, *ExEventObjectType, KernelMode, &(_this->UnloadEventObject), NULL);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ObReferenceObjectByHandle failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -306,6 +311,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
     Status = ZwOpenKey(&(_this->CodeIntegrityPolicyKey), KEY_READ, &KeyAttribute);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwOpenKey failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -320,6 +326,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         &ResultLength);
     if (Status != STATUS_BUFFER_OVERFLOW && Status != STATUS_BUFFER_TOO_SMALL && Status != STATUS_SUCCESS)
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwQueryValueKey failed: %!STATUS!", Status);
         goto finalize;
     }
     _this->CodeIntegrityWhqlSettingsValueInfo =
@@ -327,6 +334,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
     if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExAllocatePoolWithTag failed: %!STATUS!", Status);
         goto finalize;
     }
     _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
@@ -340,6 +348,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         &(_this->WorkerHandle), THREAD_ALL_ACCESS, &ThreadAttribute, NULL, NULL, _this->pFunc, __this);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! PsCreateSystemThread failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -347,6 +356,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         _this->WorkerHandle, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &(_this->WorkerObject), NULL);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ObReferenceObjectByHandle failed: %!STATUS!", Status);
         goto finalize;
     }
 
