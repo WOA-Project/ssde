@@ -75,59 +75,72 @@ Return Value:
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "InitializeWorker failed %!STATUS!", status);
-        return status;
+        goto exit;
     }
 
     status = LicensedInitializeWorker();
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "LicensedInitializeWorker failed %!STATUS!", status);
-        return status;
+        goto exit;
     }
 
     status = WhqlInitializeWorker();
     if (!NT_SUCCESS(status))
     {
         TraceEvents(TRACE_LEVEL_ERROR, TRACE_DRIVER, "WhqlInitializeWorker failed %!STATUS!", status);
-        return status;
+        goto exit;
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+exit:
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
     return status;
 }
 
 VOID OnUnload(PDRIVER_OBJECT DriverObject)
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     UNREFERENCED_PARAMETER(DriverObject);
 
     UninitializeWorker();
     LicensedUninitializeWorker();
     WhqlUninitializeWorker();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
 }
 
-FORCEINLINE
 NTSTATUS IrpDispatchDone(
     PIRP Irp, 
     NTSTATUS Status
 )
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     Irp->IoStatus.Status = Status;
     Irp->IoStatus.Information = 0;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
+
     return Status;
 }
 
-FORCEINLINE
 NTSTATUS IrpDispatchDoneEx(
     PIRP Irp,
     NTSTATUS Status,
     ULONG Information
 )
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     Irp->IoStatus.Status = Status;
     Irp->IoStatus.Information = Information;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
+
     return Status;
 }
 
@@ -138,6 +151,8 @@ NTSTATUS OnCreate(
 {
     PAGED_CODE();
 
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     UNREFERENCED_PARAMETER(DeviceObject);
 
     PIO_STACK_LOCATION sl = IoGetCurrentIrpStackLocation(Irp);
@@ -147,7 +162,11 @@ NTSTATUS OnCreate(
         ? STATUS_INVALID_PARAMETER
         : STATUS_SUCCESS;
 
-    return IrpDispatchDone(Irp, status);
+    status = IrpDispatchDone(Irp, status);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
+
+    return status;
 }
 
 NTSTATUS OnClose(
@@ -172,9 +191,15 @@ NTSTATUS OnDeviceControl(
     PIRP Irp
 )
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     UNREFERENCED_PARAMETER(DeviceObject);
 
-    return IrpDispatchDoneEx(Irp, STATUS_INVALID_PARAMETER, 0);
+    NTSTATUS status = IrpDispatchDoneEx(Irp, STATUS_INVALID_PARAMETER, 0);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
+
+    return status;
 }
 
 NTSTATUS OnOther(
@@ -182,7 +207,13 @@ NTSTATUS OnOther(
     PIRP Irp
 )
 {
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
     UNREFERENCED_PARAMETER(DeviceObject);
 
-    return IrpDispatchDone(Irp, STATUS_INVALID_DEVICE_REQUEST);
+    NTSTATUS status = IrpDispatchDone(Irp, STATUS_INVALID_DEVICE_REQUEST);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
+
+    return status;
 }

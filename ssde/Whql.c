@@ -81,7 +81,7 @@ WhqlWorker_Delete(PWHQLSSDEWORKER *__this)
         *__this = NULL;
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -119,7 +119,7 @@ WhqlZwQueryValueKey2(
 
     ExFreePool(pinfo);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
     return status;
 }
@@ -204,7 +204,7 @@ EnsureWhqlIsLicensed(_In_ PWHQLSSDEWORKER *__this)
         0,
         TRUE);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -240,7 +240,7 @@ WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
 
     WhqlWorker_Delete(__this);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -361,7 +361,7 @@ finalize:
         }
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -375,7 +375,7 @@ WhqlInitializeWorker()
 
     status = WhqlWorker_MakeAndInitialize(&WhqlWorker);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
     return status;
 }

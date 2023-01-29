@@ -82,7 +82,7 @@ LicensedWorker_Delete(PLICENSEDSSDEWORKER *__this)
         *__this = NULL;
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -120,7 +120,7 @@ LicensedZwQueryValueKey2(
 
     ExFreePool(pinfo);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
     return status;
 }
@@ -205,7 +205,7 @@ EnsureProtectedIsLicensed(_In_ PLICENSEDSSDEWORKER *__this)
         0,
         TRUE);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -241,7 +241,7 @@ LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
 
     LicensedWorker_Delete(__this);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -362,7 +362,7 @@ finalize:
         }
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -376,7 +376,7 @@ LicensedInitializeWorker()
 
     status = LicensedWorker_MakeAndInitialize(&LicensedWorker);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
     return status;
 }

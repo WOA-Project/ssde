@@ -31,30 +31,33 @@ UNICODE_STRING gProductPolicyValueName = RTL_CONSTANT_STRING(PRODUCT_POLICY_STR)
 
 UNICODE_STRING gCiAcpCksName = RTL_CONSTANT_STRING(L"CodeIntegrity-AllowConfigurablePolicy-CustomKernelSigners");
 
-LONG
+NTSTATUS
 HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
 {
     BOOLEAN AllowConfigurablePolicyCustomKernelSignerSet = FALSE;
     PPPBinaryHeader pHeader = (PPPBinaryHeader)lpBytes;
     PUCHAR EndPtr = lpBytes + cbBytes;
     PPPBinaryValue pVal;
+    NTSTATUS Status = STATUS_SUCCESS;
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     if (cbBytes < sizeof(PPBinaryHeader) || cbBytes != pHeader->TotalSize ||
         cbBytes != sizeof(PPBinaryHeader) + sizeof(ULONG) + pHeader->DataSize)
     {
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+        Status = 0xC0000004L;
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
-        return 0xC0000004L;
+        return Status;
     }
 
     EndPtr -= sizeof(ULONG);
     if (*(PULONG)EndPtr != 0x45) // Product policy end-mark
     {
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+        Status = STATUS_INVALID_PARAMETER;
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
-        return STATUS_INVALID_PARAMETER;
+        return Status;
     }
 
     for (pVal = (PPPBinaryValue)(pHeader + 1); (PUCHAR)pVal + sizeof(PPBinaryValue) < EndPtr;
@@ -65,9 +68,10 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
 
         if (pVal->NameSize % 2 != 0)
         {
-            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+            Status = STATUS_INVALID_PARAMETER;
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
-            return STATUS_INVALID_PARAMETER;
+            return Status;
         }
 
         pValName = (PWSTR)(pVal + 1);
@@ -75,9 +79,10 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
 
         if ((PUCHAR)pValData + pVal->DataSize > EndPtr)
         {
-            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+            Status = STATUS_INVALID_PARAMETER;
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
-            return STATUS_INVALID_PARAMETER;
+            return Status;
         }
 
         if (AllowConfigurablePolicyCustomKernelSignerSet == FALSE &&
@@ -99,16 +104,17 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
             }
             else
             {
-                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+                Status = STATUS_INVALID_PARAMETER;
+                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
-                return STATUS_INVALID_PARAMETER;
+                return Status;
             }
         }
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
-    return 0;
+    return Status;
 }
 
 PSSDEWORKER Worker = NULL;
@@ -164,7 +170,7 @@ Worker_Delete(PSSDEWORKER *__this)
         *__this = NULL;
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -244,7 +250,7 @@ EnsureCksIsLicensed(_In_ PSSDEWORKER *__this)
 #pragma warning(default : 6011)
         if (!NT_SUCCESS(Status))
         {
-            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
             return Status;
         }
@@ -264,7 +270,7 @@ EnsureCksIsLicensed(_In_ PSSDEWORKER *__this)
         0,
         TRUE);
         
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -300,7 +306,7 @@ Worker_Work(_In_ PSSDEWORKER *__this)
 
     Worker_Delete(__this);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -327,6 +333,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExAllocatePoolWithTag failed: %!STATUS!", Status);
         goto finalize;
     }
     *__this = _this;
@@ -335,6 +342,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         &(_this->ProductOptionsKeyChangeEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwCreateEvent failed: %!STATUS!", Status);
         goto finalize;
     }
     Status = ObReferenceObjectByHandle(
@@ -346,18 +354,21 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         NULL);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ObReferenceObjectByHandle failed: %!STATUS!", Status);
         goto finalize;
     }
 
     Status = ZwCreateEvent(&(_this->UnloadEventHandle), EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwCreateEvent failed: %!STATUS!", Status);
         goto finalize;
     }
     Status = ObReferenceObjectByHandle(
         _this->UnloadEventHandle, EVENT_ALL_ACCESS, *ExEventObjectType, KernelMode, &(_this->UnloadEventObject), NULL);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ObReferenceObjectByHandle failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -366,6 +377,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
     Status = ZwOpenKey(&(_this->ProductOptionsKey), KEY_READ, &KeyAttribute);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwOpenKey failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -380,6 +392,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         &ResultLength);
     if (Status != STATUS_BUFFER_OVERFLOW && Status != STATUS_BUFFER_TOO_SMALL && Status != STATUS_SUCCESS)
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ZwQueryValueKey failed: %!STATUS!", Status);
         goto finalize;
     }
     _this->ProductPolicyValueInfo =
@@ -387,6 +400,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
     if (_this->ProductPolicyValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExAllocatePoolWithTag failed: %!STATUS!", Status);
         goto finalize;
     }
     _this->ProductPolicyValueInfoSize = ResultLength;
@@ -400,6 +414,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         &(_this->WorkerHandle), THREAD_ALL_ACCESS, &ThreadAttribute, NULL, NULL, _this->pFunc, __this);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! PsCreateSystemThread failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -407,6 +422,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         _this->WorkerHandle, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &(_this->WorkerObject), NULL);
     if (!NT_SUCCESS(Status))
     {
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ObReferenceObjectByHandle failed: %!STATUS!", Status);
         goto finalize;
     }
 
@@ -421,7 +437,7 @@ finalize:
         }
     }
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", Status);
 
     return Status;
 }
@@ -435,7 +451,7 @@ InitializeWorker()
 
     status = Worker_MakeAndInitialize(&Worker);
 
-    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
     return status;
 }
