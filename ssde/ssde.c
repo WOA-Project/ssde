@@ -22,6 +22,7 @@ Environment:
 #    pragma alloc_text(PAGE, Worker_Delete)
 #    pragma alloc_text(PAGE, Worker_Work)
 #    pragma alloc_text(PAGE, Worker_MakeAndInitialize)
+#    pragma alloc_text(PAGE, EnsureCksIsLicensed)
 #endif
 
 UNICODE_STRING gProductOptionsKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" PRODUCT_OPTIONS_STR);
@@ -168,8 +169,8 @@ Worker_Delete(PSSDEWORKER *__this)
     return Status;
 }
 
-VOID
-Worker_Work(_In_ PSSDEWORKER *__this)
+NTSTATUS
+EnsureCksIsLicensed(_In_ PSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -183,95 +184,113 @@ Worker_Work(_In_ PSSDEWORKER *__this)
     ULONG uTag = 'ssde';
     IO_STATUS_BLOCK IoStatusBlock;
 
+    Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
+    if (!NT_SUCCESS(Status))
+    {
+        // break;
+        Status = STATUS_SUCCESS;
+        CiAcpCks = 1;
+    }
+    if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
+    {
+        // Status = STATUS_OBJECT_TYPE_MISMATCH;
+        // break;
+        CiAcpCks = 1;
+    }
+
+    if (CiAcpCks == 0)
+    {
+        while (1)
+        {
+            Status = ZwQueryValueKey(
+                _this->ProductOptionsKey,
+                &gProductPolicyValueName,
+                KeyValuePartialInformation,
+                _this->ProductPolicyValueInfo,
+                _this->ProductPolicyValueInfoSize,
+                &ResultLength);
+            if (NT_SUCCESS(Status))
+            {
+                break;
+            }
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+            {
+#pragma warning(disable : 6387)
+                ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
+#pragma warning(default : 6387)
+                _this->ProductPolicyValueInfo =
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                if (_this->ProductPolicyValueInfo)
+                {
+                    _this->ProductPolicyValueInfoSize = ResultLength;
+                }
+                else
+                {
+                    _this->ProductPolicyValueInfoSize = 0;
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        ULONG uEdit = 1;
+#pragma warning(disable : 6011)
+        Status =
+            HandlePolicyBinary(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data, &uEdit);
+#pragma warning(default : 6011)
+        if (!NT_SUCCESS(Status))
+        {
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+            return Status;
+        }
+
+        Status = ExUpdateLicenseData(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data);
+    }
+
+    Status = ZwNotifyChangeKey(
+        _this->ProductOptionsKey,
+        _this->ProductOptionsKeyChangeEventHandle,
+        NULL,
+        NULL,
+        &IoStatusBlock,
+        REG_NOTIFY_CHANGE_LAST_SET,
+        FALSE,
+        NULL,
+        0,
+        TRUE);
+        
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+    return Status;
+}
+
+VOID
+Worker_Work(_In_ PSSDEWORKER *__this)
+{
+    PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    NTSTATUS Status = STATUS_SUCCESS;
+    PSSDEWORKER _this = *__this;
+
     PVOID objects[2];
     objects[0] = _this->UnloadEventObject;
     objects[1] = _this->ProductOptionsKeyChangeEventObject;
 
     while (1)
     {
-        Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
-        if (!NT_SUCCESS(Status))
-        {
-            //break;
-            Status = STATUS_SUCCESS;
-            CiAcpCks = 1;
-        }
-        if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
-        {
-            //Status = STATUS_OBJECT_TYPE_MISMATCH;
-            //break;
-            CiAcpCks = 1;
-        }
-
-        if (CiAcpCks == 0)
-        {
-            while (1)
-            {
-                Status = ZwQueryValueKey(
-                    _this->ProductOptionsKey,
-                    &gProductPolicyValueName,
-                    KeyValuePartialInformation,
-                    _this->ProductPolicyValueInfo,
-                    _this->ProductPolicyValueInfoSize,
-                    &ResultLength);
-                if (NT_SUCCESS(Status))
-                {
-                    break;
-                }
-                else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
-                {
-#pragma warning(disable : 6387)
-                    ExFreePoolWithTag(_this->ProductPolicyValueInfo, uTag);
-#pragma warning(default : 6387)
-                    _this->ProductPolicyValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
-                    if (_this->ProductPolicyValueInfo)
-                    {
-                        _this->ProductPolicyValueInfoSize = ResultLength;
-                    }
-                    else
-                    {
-                        _this->ProductPolicyValueInfoSize = 0;
-                        Status = STATUS_NO_MEMORY;
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            ULONG uEdit = 1;
-#pragma warning(disable : 6011)
-            Status = HandlePolicyBinary(
-                _this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data, &uEdit);
-#pragma warning(default : 6011)
-            if (!NT_SUCCESS(Status))
-            {
-                break;
-            }
-
-            Status =
-                ExUpdateLicenseData(_this->ProductPolicyValueInfo->DataLength, _this->ProductPolicyValueInfo->Data);
-        }
-
-        Status = ZwNotifyChangeKey(
-            _this->ProductOptionsKey,
-            _this->ProductOptionsKeyChangeEventHandle,
-            NULL,
-            NULL,
-            &IoStatusBlock,
-            REG_NOTIFY_CHANGE_LAST_SET,
-            FALSE,
-            NULL,
-            0,
-            TRUE);
+        Status = EnsureCksIsLicensed(__this);
         if (!NT_SUCCESS(Status))
         {
             break;
         }
-
+        
         Status = KeWaitForMultipleObjects(2, objects, WaitAny, Executive, KernelMode, FALSE, NULL, NULL);
         if (Status != STATUS_WAIT_1)
         {
@@ -371,6 +390,8 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
         goto finalize;
     }
     _this->ProductPolicyValueInfoSize = ResultLength;
+
+    EnsureCksIsLicensed(__this);
 
     _this->pFunc = Worker_Work;
 

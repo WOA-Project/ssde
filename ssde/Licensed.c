@@ -21,6 +21,7 @@ Environment:
 #    pragma alloc_text(PAGE, LicensedWorker_Delete)
 #    pragma alloc_text(PAGE, LicensedWorker_Work)
 #    pragma alloc_text(PAGE, LicensedWorker_MakeAndInitialize)
+#    pragma alloc_text(PAGE, EnsureProtectedIsLicensed)
 #endif
 
 UNICODE_STRING gCodeIntegrityProtectedKeyName =
@@ -124,8 +125,8 @@ LicensedZwQueryValueKey2(
     return status;
 }
 
-VOID
-LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
+NTSTATUS
+EnsureProtectedIsLicensed(_In_ PLICENSEDSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -138,82 +139,94 @@ LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
     ULONG uTag = 'ssde';
     IO_STATUS_BLOCK IoStatusBlock;
 
+    Status = LicensedZwQueryValueKey2(
+        _this->CodeIntegrityProtectedKey, &gCodeIntegrityLicensedValueName, REG_DWORD, &Licensed, sizeof(Licensed));
+    if (!NT_SUCCESS(Status))
+    {
+        // break;
+        Status = STATUS_SUCCESS;
+        Licensed = 1;
+    }
+
+    if (Licensed == 0)
+    {
+        while (1)
+        {
+            Status = ZwQueryValueKey(
+                _this->CodeIntegrityProtectedKey,
+                &gCodeIntegrityLicensedValueName,
+                KeyValuePartialInformation,
+                _this->CodeIntegrityLicensedValueInfo,
+                _this->CodeIntegrityLicensedValueInfoSize,
+                &ResultLength);
+            if (NT_SUCCESS(Status))
+            {
+                break;
+            }
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+            {
+#pragma warning(disable : 6387)
+                ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
+#pragma warning(default : 6387)
+                _this->CodeIntegrityLicensedValueInfo =
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                if (_this->CodeIntegrityLicensedValueInfo)
+                {
+                    _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
+                }
+                else
+                {
+                    _this->CodeIntegrityLicensedValueInfoSize = 0;
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        Licensed = 1;
+
+        Status = ZwSetValueKey(
+            _this->CodeIntegrityProtectedKey, &gCodeIntegrityLicensedValueName, 0, REG_DWORD, &Licensed, sizeof(ULONG));
+    }
+
+    Status = ZwNotifyChangeKey(
+        _this->CodeIntegrityProtectedKey,
+        _this->CodeIntegrityProtectedKeyChangeEventHandle,
+        NULL,
+        NULL,
+        &IoStatusBlock,
+        REG_NOTIFY_CHANGE_LAST_SET,
+        FALSE,
+        NULL,
+        0,
+        TRUE);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+    return Status;
+}
+
+VOID
+LicensedWorker_Work(_In_ PLICENSEDSSDEWORKER *__this)
+{
+    PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    NTSTATUS Status = STATUS_SUCCESS;
+    PLICENSEDSSDEWORKER _this = *__this;
+
     PVOID objects[2];
     objects[0] = _this->UnloadEventObject;
     objects[1] = _this->CodeIntegrityProtectedKeyChangeEventObject;
 
     while (1)
     {
-        Status = LicensedZwQueryValueKey2(
-            _this->CodeIntegrityProtectedKey, &gCodeIntegrityLicensedValueName, REG_DWORD, &Licensed, sizeof(Licensed));
-        if (!NT_SUCCESS(Status))
-        {
-            //break;
-            Status = STATUS_SUCCESS;
-            Licensed = 1;
-        }
-
-        if (Licensed == 0)
-        {
-            while (1)
-            {
-                Status = ZwQueryValueKey(
-                    _this->CodeIntegrityProtectedKey,
-                    &gCodeIntegrityLicensedValueName,
-                    KeyValuePartialInformation,
-                    _this->CodeIntegrityLicensedValueInfo,
-                    _this->CodeIntegrityLicensedValueInfoSize,
-                    &ResultLength);
-                if (NT_SUCCESS(Status))
-                {
-                    break;
-                }
-                else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
-                {
-#pragma warning(disable : 6387)
-                    ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
-#pragma warning(default : 6387)
-                    _this->CodeIntegrityLicensedValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
-                    if (_this->CodeIntegrityLicensedValueInfo)
-                    {
-                        _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
-                    }
-                    else
-                    {
-                        _this->CodeIntegrityLicensedValueInfoSize = 0;
-                        Status = STATUS_NO_MEMORY;
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            Licensed = 1;
-
-            Status = ZwSetValueKey(
-                _this->CodeIntegrityProtectedKey,
-                &gCodeIntegrityLicensedValueName,
-                0,
-                REG_DWORD,
-                &Licensed,
-                sizeof(ULONG));
-        }
-
-        Status = ZwNotifyChangeKey(
-            _this->CodeIntegrityProtectedKey,
-            _this->CodeIntegrityProtectedKeyChangeEventHandle,
-            NULL,
-            NULL,
-            &IoStatusBlock,
-            REG_NOTIFY_CHANGE_LAST_SET,
-            FALSE,
-            NULL,
-            0,
-            TRUE);
+        Status = EnsureProtectedIsLicensed(__this);
         if (!NT_SUCCESS(Status))
         {
             break;
@@ -318,6 +331,8 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
         goto finalize;
     }
     _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
+
+    EnsureProtectedIsLicensed(__this);
 
     _this->pFunc = LicensedWorker_Work;
 

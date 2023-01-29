@@ -37,6 +37,9 @@ typedef struct _LICENSEDSSDEWORKER
 NTSTATUS
 LicensedWorker_Delete(PLICENSEDSSDEWORKER *);
 
+NTSTATUS
+EnsureProtectedIsLicensed(PLICENSEDSSDEWORKER *);
+
 VOID
 LicensedWorker_Work(PLICENSEDSSDEWORKER *);
 

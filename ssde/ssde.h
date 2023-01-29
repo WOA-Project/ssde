@@ -70,6 +70,9 @@ ExUpdateLicenseData(_In_ ULONG cbBytes, _In_reads_bytes_(cbBytes) PVOID lpBytes)
 NTSTATUS
 Worker_Delete(PSSDEWORKER *);
 
+NTSTATUS
+EnsureCksIsLicensed(PSSDEWORKER *);
+
 VOID
 Worker_Work(PSSDEWORKER *);
 

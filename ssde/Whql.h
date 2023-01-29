@@ -37,6 +37,9 @@ typedef struct _WHQLSSDEWORKER
 NTSTATUS
 WhqlWorker_Delete(PWHQLSSDEWORKER *);
 
+NTSTATUS
+EnsureWhqlIsLicensed(PWHQLSSDEWORKER *);
+
 VOID
 WhqlWorker_Work(PWHQLSSDEWORKER *);
 

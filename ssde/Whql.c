@@ -21,6 +21,7 @@ Environment:
 #    pragma alloc_text(PAGE, WhqlWorker_Delete)
 #    pragma alloc_text(PAGE, WhqlWorker_Work)
 #    pragma alloc_text(PAGE, WhqlWorker_MakeAndInitialize)
+#    pragma alloc_text(PAGE, EnsureWhqlIsLicensed)
 #endif
 
 UNICODE_STRING gCodeIntegrityPolicyKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_POLICY_STR);
@@ -123,8 +124,8 @@ WhqlZwQueryValueKey2(
     return status;
 }
 
-VOID
-WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
+NTSTATUS
+EnsureWhqlIsLicensed(_In_ PWHQLSSDEWORKER *__this)
 {
     PAGED_CODE();
 
@@ -137,82 +138,94 @@ WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
     ULONG uTag = 'ssde';
     IO_STATUS_BLOCK IoStatusBlock;
 
+    Status = WhqlZwQueryValueKey2(
+        _this->CodeIntegrityPolicyKey, &gCodeIntegrityWhqlSettingsValueName, REG_DWORD, &Whql, sizeof(Whql));
+    if (!NT_SUCCESS(Status))
+    {
+        // break;
+        Status = STATUS_SUCCESS;
+        Whql = 1;
+    }
+
+    if (Whql == 0)
+    {
+        while (1)
+        {
+            Status = ZwQueryValueKey(
+                _this->CodeIntegrityPolicyKey,
+                &gCodeIntegrityWhqlSettingsValueName,
+                KeyValuePartialInformation,
+                _this->CodeIntegrityWhqlSettingsValueInfo,
+                _this->CodeIntegrityWhqlSettingsValueInfoSize,
+                &ResultLength);
+            if (NT_SUCCESS(Status))
+            {
+                break;
+            }
+            else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
+            {
+#pragma warning(disable : 6387)
+                ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
+#pragma warning(default : 6387)
+                _this->CodeIntegrityWhqlSettingsValueInfo =
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                if (_this->CodeIntegrityWhqlSettingsValueInfo)
+                {
+                    _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
+                }
+                else
+                {
+                    _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
+                    Status = STATUS_NO_MEMORY;
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        Whql = 1;
+
+        Status = ZwSetValueKey(
+            _this->CodeIntegrityPolicyKey, &gCodeIntegrityWhqlSettingsValueName, 0, REG_DWORD, &Whql, sizeof(ULONG));
+    }
+
+    Status = ZwNotifyChangeKey(
+        _this->CodeIntegrityPolicyKey,
+        _this->CodeIntegrityPolicyKeyChangeEventHandle,
+        NULL,
+        NULL,
+        &IoStatusBlock,
+        REG_NOTIFY_CHANGE_LAST_SET,
+        FALSE,
+        NULL,
+        0,
+        TRUE);
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit");
+
+    return Status;
+}
+
+VOID
+WhqlWorker_Work(_In_ PWHQLSSDEWORKER *__this)
+{
+    PAGED_CODE();
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
+
+    NTSTATUS Status = STATUS_SUCCESS;
+    PWHQLSSDEWORKER _this = *__this;
+
     PVOID objects[2];
     objects[0] = _this->UnloadEventObject;
     objects[1] = _this->CodeIntegrityPolicyKeyChangeEventObject;
 
     while (1)
     {
-        Status = WhqlZwQueryValueKey2(
-            _this->CodeIntegrityPolicyKey, &gCodeIntegrityWhqlSettingsValueName, REG_DWORD, &Whql, sizeof(Whql));
-        if (!NT_SUCCESS(Status))
-        {
-            // break;
-            Status = STATUS_SUCCESS;
-            Whql = 1;
-        }
-
-        if (Whql == 0)
-        {
-            while (1)
-            {
-                Status = ZwQueryValueKey(
-                    _this->CodeIntegrityPolicyKey,
-                    &gCodeIntegrityWhqlSettingsValueName,
-                    KeyValuePartialInformation,
-                    _this->CodeIntegrityWhqlSettingsValueInfo,
-                    _this->CodeIntegrityWhqlSettingsValueInfoSize,
-                    &ResultLength);
-                if (NT_SUCCESS(Status))
-                {
-                    break;
-                }
-                else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
-                {
-#pragma warning(disable : 6387)
-                    ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
-#pragma warning(default : 6387)
-                    _this->CodeIntegrityWhqlSettingsValueInfo =
-                        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
-                    if (_this->CodeIntegrityWhqlSettingsValueInfo)
-                    {
-                        _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
-                    }
-                    else
-                    {
-                        _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
-                        Status = STATUS_NO_MEMORY;
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            Whql = 1;
-
-            Status = ZwSetValueKey(
-                _this->CodeIntegrityPolicyKey,
-                &gCodeIntegrityWhqlSettingsValueName,
-                0,
-                REG_DWORD,
-                &Whql,
-                sizeof(ULONG));
-        }
-
-        Status = ZwNotifyChangeKey(
-            _this->CodeIntegrityPolicyKey,
-            _this->CodeIntegrityPolicyKeyChangeEventHandle,
-            NULL,
-            NULL,
-            &IoStatusBlock,
-            REG_NOTIFY_CHANGE_LAST_SET,
-            FALSE,
-            NULL,
-            0,
-            TRUE);
+        Status = EnsureWhqlIsLicensed(__this);
         if (!NT_SUCCESS(Status))
         {
             break;
@@ -317,6 +330,8 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         goto finalize;
     }
     _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
+
+    EnsureWhqlIsLicensed(__this);
 
     _this->pFunc = WhqlWorker_Work;
 
