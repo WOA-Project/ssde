@@ -25,6 +25,10 @@ Environment:
 #    pragma alloc_text(PAGE, EnsureCksIsLicensed)
 #endif
 
+#define SSDE_POOL_TAG_0 '0dss'
+#define SSDE_POOL_TAG_1 '1dss'
+#define SSDE_POOL_TAG_2 '2dss'
+
 UNICODE_STRING gProductOptionsKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" PRODUCT_OPTIONS_STR);
 
 UNICODE_STRING gProductPolicyValueName = RTL_CONSTANT_STRING(PRODUCT_POLICY_STR);
@@ -127,7 +131,7 @@ Worker_Delete(PSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = 'ssde';
+    ULONG uTag = SSDE_POOL_TAG_0;
     PSSDEWORKER _this = *__this;
 
     if (_this)
@@ -187,7 +191,7 @@ EnsureCksIsLicensed(_In_ PSSDEWORKER *__this)
     ULONG PolicyValueType = 0;
     ULONG CiAcpCks = 0;
     ULONG ResultLength = 0;
-    ULONG uTag = 'ssde';
+    ULONG uTag = SSDE_POOL_TAG_1;
     IO_STATUS_BLOCK IoStatusBlock;
 
     Status = ZwQueryLicenseValue(&gCiAcpCksName, &PolicyValueType, &CiAcpCks, sizeof(CiAcpCks), &ResultLength);
@@ -320,7 +324,7 @@ Worker_MakeAndInitialize(PSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = 'ssde';
+    ULONG uTag = SSDE_POOL_TAG_2;
     OBJECT_ATTRIBUTES ThreadAttribute;
     PSSDEWORKER _this = NULL;
 

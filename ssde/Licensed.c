@@ -24,6 +24,11 @@ Environment:
 #    pragma alloc_text(PAGE, EnsureProtectedIsLicensed)
 #endif
 
+#define LICENSED_POOL_TAG_0 '0dsl'
+#define LICENSED_POOL_TAG_1 '1dsl'
+#define LICENSED_POOL_TAG_2 '2dsl'
+#define LICENSED_POOL_TAG_3 '3dsl'
+
 UNICODE_STRING gCodeIntegrityProtectedKeyName =
     RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_PROTECTED_STR);
 
@@ -39,7 +44,7 @@ LicensedWorker_Delete(PLICENSEDSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = 'ssde';
+    ULONG uTag = LICENSED_POOL_TAG_0;
     PLICENSEDSSDEWORKER _this = *__this;
 
     if (_this)
@@ -103,7 +108,7 @@ LicensedZwQueryValueKey2(
 
     len = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + DataSize;
 
-    pinfo = ExAllocatePoolWithTag(NonPagedPool, len, 'ssde');
+    pinfo = ExAllocatePoolWithTag(NonPagedPool, len, LICENSED_POOL_TAG_1);
 
     status = ZwQueryValueKey(KeyHandle, ValueName, KeyValuePartialInformation, pinfo, len, &reslen);
 
@@ -118,7 +123,7 @@ LicensedZwQueryValueKey2(
         reslen = 0;
     }
 
-    ExFreePool(pinfo);
+    ExFreePoolWithTag(pinfo, LICENSED_POOL_TAG_1);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
@@ -136,7 +141,7 @@ EnsureProtectedIsLicensed(_In_ PLICENSEDSSDEWORKER *__this)
     PLICENSEDSSDEWORKER _this = *__this;
     ULONG Licensed = 0;
     ULONG ResultLength = 0;
-    ULONG uTag = 'ssde';
+    ULONG uTag = LICENSED_POOL_TAG_2;
     IO_STATUS_BLOCK IoStatusBlock;
 
     Status = LicensedZwQueryValueKey2(
@@ -254,7 +259,7 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = 'ssde';
+    ULONG uTag = LICENSED_POOL_TAG_3;
     OBJECT_ATTRIBUTES ThreadAttribute;
     PLICENSEDSSDEWORKER _this = NULL;
 

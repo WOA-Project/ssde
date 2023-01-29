@@ -24,6 +24,11 @@ Environment:
 #    pragma alloc_text(PAGE, EnsureWhqlIsLicensed)
 #endif
 
+#define WHQL_POOL_TAG_0 '0qhw'
+#define WHQL_POOL_TAG_1 '1qhw'
+#define WHQL_POOL_TAG_2 '2qhw'
+#define WHQL_POOL_TAG_3 '3qhw'
+
 UNICODE_STRING gCodeIntegrityPolicyKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_POLICY_STR);
 
 UNICODE_STRING gCodeIntegrityWhqlSettingsValueName = RTL_CONSTANT_STRING(CODEINTEGRITY_WHQL_SETTINGS_STR);
@@ -38,7 +43,7 @@ WhqlWorker_Delete(PWHQLSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = 'ssde';
+    ULONG uTag = WHQL_POOL_TAG_0;
     PWHQLSSDEWORKER _this = *__this;
 
     if (_this)
@@ -102,7 +107,7 @@ WhqlZwQueryValueKey2(
 
     len = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + DataSize;
 
-    pinfo = ExAllocatePoolWithTag(NonPagedPool, len, 'ssde');
+    pinfo = ExAllocatePoolWithTag(NonPagedPool, len, WHQL_POOL_TAG_1);
 
     status = ZwQueryValueKey(KeyHandle, ValueName, KeyValuePartialInformation, pinfo, len, &reslen);
 
@@ -117,7 +122,7 @@ WhqlZwQueryValueKey2(
         reslen = 0;
     }
 
-    ExFreePool(pinfo);
+    ExFreePoolWithTag(pinfo, WHQL_POOL_TAG_1);
 
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Exit %!STATUS!", status);
 
@@ -135,7 +140,7 @@ EnsureWhqlIsLicensed(_In_ PWHQLSSDEWORKER *__this)
     PWHQLSSDEWORKER _this = *__this;
     ULONG Whql = 0;
     ULONG ResultLength = 0;
-    ULONG uTag = 'ssde';
+    ULONG uTag = WHQL_POOL_TAG_2;
     IO_STATUS_BLOCK IoStatusBlock;
 
     Status = WhqlZwQueryValueKey2(
@@ -253,7 +258,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = 'ssde';
+    ULONG uTag = WHQL_POOL_TAG_3;
     OBJECT_ATTRIBUTES ThreadAttribute;
     PWHQLSSDEWORKER _this = NULL;
 
