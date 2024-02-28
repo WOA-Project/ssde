@@ -19,9 +19,9 @@ Environment:
 
 #ifdef ALLOC_PRAGMA
 #    pragma alloc_text(INIT, DriverEntry)
-#    pragma alloc_text(PAGE, OnCreate)
-#    pragma alloc_text(PAGE, OnUnload)
-#    pragma alloc_text(PAGE, OnClose)
+#    pragma alloc_text(PAGE, DriverCreate)
+#    pragma alloc_text(PAGE, DriverUnload)
+#    pragma alloc_text(PAGE, DriverClose)
 #endif
 
 NTSTATUS
@@ -62,14 +62,14 @@ Return Value:
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     for (int n = 0; n <= IRP_MJ_MAXIMUM_FUNCTION; n++) {
-        DriverObject->MajorFunction[n] = OnOther;
+        DriverObject->MajorFunction[n] = DriverStub;
     }
 
-    DriverObject->MajorFunction[IRP_MJ_CREATE] = OnCreate;
-    DriverObject->MajorFunction[IRP_MJ_CLOSE] = OnClose;
+    DriverObject->MajorFunction[IRP_MJ_CREATE] = DriverCreate;
+    DriverObject->MajorFunction[IRP_MJ_CLOSE] = DriverClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = OnDeviceControl;
 
-    DriverObject->DriverUnload = OnUnload;
+    DriverObject->DriverUnload = DriverUnload;
 
     status = InitializeWorker();
     if (!NT_SUCCESS(status))
@@ -98,7 +98,7 @@ exit:
     return status;
 }
 
-VOID OnUnload(PDRIVER_OBJECT DriverObject)
+VOID DriverUnload(PDRIVER_OBJECT DriverObject)
 {
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
@@ -144,7 +144,7 @@ NTSTATUS IrpDispatchDoneEx(
     return Status;
 }
 
-NTSTATUS OnCreate(
+NTSTATUS DriverCreate(
     PDEVICE_OBJECT DeviceObject, 
     PIRP Irp
 )
@@ -169,7 +169,7 @@ NTSTATUS OnCreate(
     return status;
 }
 
-NTSTATUS OnClose(
+NTSTATUS DriverClose(
     PDEVICE_OBJECT DeviceObject,
     PIRP Irp
 )
@@ -202,7 +202,7 @@ NTSTATUS OnDeviceControl(
     return status;
 }
 
-NTSTATUS OnOther(
+NTSTATUS DriverStub(
     PDEVICE_OBJECT DeviceObject,
     PIRP Irp
 )
