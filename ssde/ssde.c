@@ -29,11 +29,13 @@ Environment:
 #define SSDE_POOL_TAG_1 '1dss'
 #define SSDE_POOL_TAG_2 '2dss'
 
+#define CI_ACP_CUSTOMKERNELSIGNERS L"CodeIntegrity-AllowConfigurablePolicy-CustomKernelSigners"
+
 UNICODE_STRING gProductOptionsKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" PRODUCT_OPTIONS_STR);
 
 UNICODE_STRING gProductPolicyValueName = RTL_CONSTANT_STRING(PRODUCT_POLICY_STR);
 
-UNICODE_STRING gCiAcpCksName = RTL_CONSTANT_STRING(L"CodeIntegrity-AllowConfigurablePolicy-CustomKernelSigners");
+UNICODE_STRING gCiAcpCksName = RTL_CONSTANT_STRING(CI_ACP_CUSTOMKERNELSIGNERS);
 
 NTSTATUS
 HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
@@ -90,7 +92,7 @@ HandlePolicyBinary(_In_ ULONG cbBytes, _In_ PUCHAR lpBytes, _In_ PULONG uEdit)
         }
 
         if (AllowConfigurablePolicyCustomKernelSignerSet == FALSE &&
-            _wcsnicmp(pValName, L"CodeIntegrity-AllowConfigurablePolicy-CustomKernelSigners", pVal->NameSize / 2) == 0)
+            _wcsnicmp(pValName, CI_ACP_CUSTOMKERNELSIGNERS, pVal->NameSize / 2) == 0)
         {
             if (pVal->DataType == REG_DWORD && pVal->DataSize == 4)
             {
