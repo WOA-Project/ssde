@@ -26,8 +26,6 @@ Environment:
 
 #define LICENSED_POOL_TAG_0 '0dsl'
 #define LICENSED_POOL_TAG_1 '1dsl'
-#define LICENSED_POOL_TAG_2 '2dsl'
-#define LICENSED_POOL_TAG_3 '3dsl'
 
 UNICODE_STRING gCodeIntegrityProtectedKeyName =
     RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_PROTECTED_STR);
@@ -44,14 +42,13 @@ LicensedWorker_Delete(PLICENSEDSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = LICENSED_POOL_TAG_0;
     PLICENSEDSSDEWORKER _this = *__this;
 
     if (_this)
     {
         if (_this->CodeIntegrityLicensedValueInfo)
         {
-            ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
+            ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, LICENSED_POOL_TAG_1);
             _this->CodeIntegrityLicensedValueInfo = NULL;
             _this->CodeIntegrityLicensedValueInfoSize = 0;
         }
@@ -83,7 +80,7 @@ LicensedWorker_Delete(PLICENSEDSSDEWORKER *__this)
             _this->WorkerHandle = NULL;
         }
         _this->pFunc = NULL;
-        ExFreePoolWithTag(_this, uTag);
+        ExFreePoolWithTag(_this, LICENSED_POOL_TAG_0);
         *__this = NULL;
     }
 
@@ -141,7 +138,6 @@ EnsureProtectedIsLicensed(_In_ PLICENSEDSSDEWORKER *__this)
     PLICENSEDSSDEWORKER _this = *__this;
     ULONG Licensed = 0;
     ULONG ResultLength = 0;
-    ULONG uTag = LICENSED_POOL_TAG_2;
     IO_STATUS_BLOCK IoStatusBlock;
 
     Status = LicensedZwQueryValueKey2(
@@ -171,10 +167,10 @@ EnsureProtectedIsLicensed(_In_ PLICENSEDSSDEWORKER *__this)
             else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
             {
 #pragma warning(disable : 6387)
-                ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, uTag);
+                ExFreePoolWithTag(_this->CodeIntegrityLicensedValueInfo, LICENSED_POOL_TAG_1);
 #pragma warning(default : 6387)
                 _this->CodeIntegrityLicensedValueInfo =
-                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, LICENSED_POOL_TAG_1);
                 if (_this->CodeIntegrityLicensedValueInfo)
                 {
                     _this->CodeIntegrityLicensedValueInfoSize = ResultLength;
@@ -259,7 +255,6 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = LICENSED_POOL_TAG_3;
     OBJECT_ATTRIBUTES ThreadAttribute;
     PLICENSEDSSDEWORKER _this = NULL;
 
@@ -269,7 +264,7 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
         goto finalize;
     }
 
-    _this = (PLICENSEDSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(LICENSEDSSDEWORKER), uTag);
+    _this = (PLICENSEDSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(LICENSEDSSDEWORKER), LICENSED_POOL_TAG_0);
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -336,7 +331,7 @@ LicensedWorker_MakeAndInitialize(PLICENSEDSSDEWORKER *__this)
         goto finalize;
     }
     _this->CodeIntegrityLicensedValueInfo =
-        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, LICENSED_POOL_TAG_1);
     if (_this->CodeIntegrityLicensedValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;

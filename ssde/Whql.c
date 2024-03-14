@@ -26,8 +26,6 @@ Environment:
 
 #define WHQL_POOL_TAG_0 '0qhw'
 #define WHQL_POOL_TAG_1 '1qhw'
-#define WHQL_POOL_TAG_2 '2qhw'
-#define WHQL_POOL_TAG_3 '3qhw'
 
 UNICODE_STRING gCodeIntegrityPolicyKeyName = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\" CODEINTEGRITY_POLICY_STR);
 
@@ -43,14 +41,13 @@ WhqlWorker_Delete(PWHQLSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = WHQL_POOL_TAG_0;
     PWHQLSSDEWORKER _this = *__this;
 
     if (_this)
     {
         if (_this->CodeIntegrityWhqlSettingsValueInfo)
         {
-            ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
+            ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, WHQL_POOL_TAG_1);
             _this->CodeIntegrityWhqlSettingsValueInfo = NULL;
             _this->CodeIntegrityWhqlSettingsValueInfoSize = 0;
         }
@@ -82,7 +79,7 @@ WhqlWorker_Delete(PWHQLSSDEWORKER *__this)
             _this->WorkerHandle = NULL;
         }
         _this->pFunc = NULL;
-        ExFreePoolWithTag(_this, uTag);
+        ExFreePoolWithTag(_this, WHQL_POOL_TAG_0);
         *__this = NULL;
     }
 
@@ -140,7 +137,6 @@ EnsureWhqlIsLicensed(_In_ PWHQLSSDEWORKER *__this)
     PWHQLSSDEWORKER _this = *__this;
     ULONG Whql = 0;
     ULONG ResultLength = 0;
-    ULONG uTag = WHQL_POOL_TAG_2;
     IO_STATUS_BLOCK IoStatusBlock;
 
     Status = WhqlZwQueryValueKey2(
@@ -170,10 +166,10 @@ EnsureWhqlIsLicensed(_In_ PWHQLSSDEWORKER *__this)
             else if (Status == STATUS_BUFFER_OVERFLOW || Status == STATUS_BUFFER_TOO_SMALL)
             {
 #pragma warning(disable : 6387)
-                ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, uTag);
+                ExFreePoolWithTag(_this->CodeIntegrityWhqlSettingsValueInfo, WHQL_POOL_TAG_1);
 #pragma warning(default : 6387)
                 _this->CodeIntegrityWhqlSettingsValueInfo =
-                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, uTag);
+                    (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, ResultLength, WHQL_POOL_TAG_1);
                 if (_this->CodeIntegrityWhqlSettingsValueInfo)
                 {
                     _this->CodeIntegrityWhqlSettingsValueInfoSize = ResultLength;
@@ -258,7 +254,6 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
     TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! Entry");
 
     NTSTATUS Status = STATUS_SUCCESS;
-    ULONG uTag = WHQL_POOL_TAG_3;
     OBJECT_ATTRIBUTES ThreadAttribute;
     PWHQLSSDEWORKER _this = NULL;
 
@@ -268,7 +263,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         goto finalize;
     }
 
-    _this = (PWHQLSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(WHQLSSDEWORKER), uTag);
+    _this = (PWHQLSSDEWORKER)ExAllocatePoolWithTag(PagedPool, sizeof(WHQLSSDEWORKER), WHQL_POOL_TAG_0);
     if (_this == NULL)
     {
         Status = STATUS_NO_MEMORY;
@@ -335,7 +330,7 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         goto finalize;
     }
     _this->CodeIntegrityWhqlSettingsValueInfo =
-        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, uTag);
+        (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, ResultLength, WHQL_POOL_TAG_1);
     if (_this->CodeIntegrityWhqlSettingsValueInfo == NULL)
     {
         Status = STATUS_NO_MEMORY;
