@@ -20,27 +20,35 @@ Environment:
 #define PRODUCT_OPTIONS_STR L"SYSTEM\\CurrentControlSet\\Control\\ProductOptions"
 #define PRODUCT_POLICY_STR L"ProductPolicy"
 
-typedef struct _PPBinaryHeader
+typedef struct _ProductPolicyHeader
 {
-    ULONG TotalSize;
-    ULONG DataSize;
-    ULONG EndMarkerSize;
+    ULONG cbSize;
+    ULONG cbDataSize;
+    ULONG cbEndMarker;
     ULONG Reserved;
     ULONG Revision;
-} PPBinaryHeader, *PPPBinaryHeader;
+} ProductPolicyHeader, *PProductPolicyHeader;
 
-typedef struct _PPBinaryValue
+typedef struct _ProductPolicyValue
 {
-    USHORT TotalSize;
-    USHORT NameSize;
-    USHORT DataType;
-    USHORT DataSize;
+    USHORT cbSize;
+    USHORT cbName;
+    USHORT SlDataType;
+    USHORT cbData;
     ULONG Flags;
     ULONG Reserved;
-} PPBinaryValue, *PPPBinaryValue;
+} ProductPolicyValue, *PProductPolicyValue;
 
-LONG
-HandlePolicyBinary(_In_ ULONG, _In_ PUCHAR, _In_ PULONG);
+#define PPV_TYPE_NONE 0
+#define PPV_TYPE_SZ 1
+#define PPV_TYPE_BINARY 3
+#define PPV_TYPE_DWORD 4
+#define PPV_TYPE_MULTI_SZ 7
+
+NTSTATUS
+EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR ProductOptionsBuffer);
+
+ULONG IsCksLicensed();
 
 typedef struct _SSDEWORKER
 {

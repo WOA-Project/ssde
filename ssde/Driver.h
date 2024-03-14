@@ -33,11 +33,11 @@ EXTERN_C_START
 
 DRIVER_INITIALIZE DriverEntry;
 
-__drv_dispatchType(IRP_MJ_CREATE) DRIVER_DISPATCH_PAGED OnCreate;
-__drv_dispatchType(IRP_MJ_CLOSE) DRIVER_DISPATCH_PAGED OnClose;
+__drv_dispatchType(IRP_MJ_CREATE) DRIVER_DISPATCH_PAGED DriverCreate;
+__drv_dispatchType(IRP_MJ_CLOSE) DRIVER_DISPATCH_PAGED DriverClose;
 __drv_dispatchType(IRP_MJ_DEVICE_CONTROL) DRIVER_DISPATCH OnDeviceControl;
-__drv_dispatchType_other DRIVER_DISPATCH OnOther;
+__drv_dispatchType_other DRIVER_DISPATCH DriverStub;
 
-DRIVER_UNLOAD OnUnload;
+DRIVER_UNLOAD DriverUnload;
 
 EXTERN_C_END
