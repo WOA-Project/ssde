@@ -38,7 +38,7 @@ UNICODE_STRING gProductPolicyValueName = RTL_CONSTANT_STRING(PRODUCT_POLICY_STR)
 UNICODE_STRING gCiAcpCksName = RTL_CONSTANT_STRING(CI_ACP_CUSTOMKERNELSIGNERS);
 
 NTSTATUS
-EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR ProductOptionsBuffer)
+EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR ProductOptionsBuffer, _In_ PULONG uEdit)
 {
     NTSTATUS Status = STATUS_SUCCESS;
 
@@ -58,57 +58,50 @@ EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR Produ
         goto exit;
     }
 
-    if (pProductPolicyHeader->cbSize < ProductOptionsBufferSize || pProductPolicyHeader->cbDataSize + sizeof(ProductPolicyHeader) + pProductPolicyHeader->cbEndMarker != pProductPolicyHeader->cbSize)
+    if (pProductPolicyHeader->cbSize != ProductOptionsBufferSize || pProductPolicyHeader->cbDataSize + sizeof(ProductPolicyHeader) + sizeof(ULONG) != pProductPolicyHeader->cbSize)
     {
         Status = STATUS_INVALID_PARAMETER;
         goto exit;
     }
 
-    ULONG CurrentProductOptionsBufferOffset = sizeof(ProductPolicyHeader);
-    ULONG MaximumProductOptionsBufferOffset = CurrentProductOptionsBufferOffset + pProductPolicyHeader->cbDataSize;
+    PUCHAR EndPtr = ProductOptionsBuffer + ProductOptionsBufferSize;
 
-    while (CurrentProductOptionsBufferOffset < MaximumProductOptionsBufferOffset)
+    EndPtr -= sizeof(ULONG);
+    if (*(PULONG)EndPtr != 0x45) // Product policy end-mark
     {
-        PProductPolicyValue pVal = (PProductPolicyValue)(ProductOptionsBuffer + CurrentProductOptionsBufferOffset);
+        Status = STATUS_INVALID_PARAMETER;
+        goto exit;
+    }
 
-        if (pVal->cbSize < sizeof(ProductPolicyValue))
-        {
-            Status = STATUS_INVALID_PARAMETER;
-            goto exit;
-        }
-
-        if (pVal->cbData + pVal->cbName + sizeof(ProductPolicyValue) > pVal->cbSize || pVal->cbSize > CurrentProductOptionsBufferOffset)
-        {
-            Status = STATUS_INVALID_PARAMETER;
-            goto exit;
-        }
-
+    for (PProductPolicyValue pVal = (PProductPolicyValue)(pProductPolicyHeader + 1); (PUCHAR)pVal + sizeof(ProductPolicyValue) < EndPtr; pVal = (PProductPolicyValue)((PUCHAR)pVal + pVal->cbSize))
+    {
         if (pVal->cbName % 2 != 0)
         {
             Status = STATUS_INVALID_PARAMETER;
             goto exit;
         }
 
-        PWSTR pValName = (PWSTR)(ProductOptionsBuffer + CurrentProductOptionsBufferOffset + sizeof(ProductPolicyValue));
-        ULONG pValNameSize = pVal->cbName;
+        PWSTR pValName = (PWSTR)(pVal + 1);
+        PVOID pValData = (PUCHAR)pValName + pVal->cbName;
 
-        if (_wcsnicmp(pValName, CI_ACP_CUSTOMKERNELSIGNERS, pValNameSize / 2) == 0)
+        if ((PUCHAR)pValData + pVal->cbData > EndPtr)
+        {
+            Status = STATUS_INVALID_PARAMETER;
+            goto exit;
+        }
+
+        if (_wcsnicmp(pValName, CI_ACP_CUSTOMKERNELSIGNERS, pVal->cbName / 2) == 0)
         {
             if (pVal->SlDataType == PPV_TYPE_DWORD && pVal->cbData == 4)
             {
-                PULONG pValData = (PULONG)(ProductOptionsBuffer + CurrentProductOptionsBufferOffset + sizeof(ProductPolicyValue) + pValNameSize);
-
-                if (*pValData == 0)
+                if (*uEdit)
                 {
-                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! CI_ACP_CUSTOMKERNELSIGNERS is 0, setting to 1");
-                    *pValData = 1;
-
-                    Status = ExUpdateLicenseData(ProductOptionsBufferSize, ProductOptionsBuffer);
-                    if (!NT_SUCCESS(Status))
-                    {
-                        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExUpdateLicenseData failed: %!STATUS!", Status);
-                        goto exit;
-                    }
+                    *(PULONG)pValData = *uEdit;
+                    *uEdit = 0;
+                }
+                else
+                {
+                    *uEdit = *(PULONG)pValData;
                 }
 
                 goto exit;
@@ -117,8 +110,6 @@ EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR Produ
             Status = STATUS_INVALID_PARAMETER;
             goto exit;
         }
-
-        CurrentProductOptionsBufferOffset += pVal->cbSize;
     }
 
 exit:
@@ -202,7 +193,7 @@ ULONG IsCksLicensed()
         return TRUE;
     }
 
-    if (PolicyValueType != REG_DWORD || ResultLength != sizeof(ULONG))
+    if (PolicyValueType != PPV_TYPE_DWORD || ResultLength != sizeof(ULONG))
     {
         // If any failure occurs, the value may be missing or garbled, in this case, the feature would be enabled anyway by CI.
         return TRUE;
@@ -265,10 +256,20 @@ EnsureCksIsLicensed(_In_ PSSDEWORKER *pWorkerContext)
             WorkerContext->ProductPolicyValueInfoSize = ResultLength;
         }
 
-        Status = EnableCustomKernelSigners(WorkerContext->ProductPolicyValueInfo->DataLength, WorkerContext->ProductPolicyValueInfo->Data);
+        ULONG uEdit = 1;
+#pragma warning(disable : 6011)
+        Status = EnableCustomKernelSigners(WorkerContext->ProductPolicyValueInfo->DataLength, WorkerContext->ProductPolicyValueInfo->Data, &uEdit);
+#pragma warning(default : 6011)
         if (!NT_SUCCESS(Status))
         {
             goto exit;
+        }
+
+        Status = ExUpdateLicenseData(WorkerContext->ProductPolicyValueInfo->DataLength, WorkerContext->ProductPolicyValueInfo->Data);
+        if (!NT_SUCCESS(Status))
+        {
+            TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExUpdateLicenseData failed: %!STATUS!", Status);
+            //goto exit;
         }
     }
 

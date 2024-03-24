@@ -46,7 +46,7 @@ typedef struct _ProductPolicyValue
 #define PPV_TYPE_MULTI_SZ 7
 
 NTSTATUS
-EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR ProductOptionsBuffer);
+EnableCustomKernelSigners(_In_ ULONG ProductOptionsBufferSize, _In_ PUCHAR ProductOptionsBuffer, _In_ PULONG uEdit);
 
 ULONG IsCksLicensed();
 
