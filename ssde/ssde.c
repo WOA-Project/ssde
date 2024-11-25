@@ -360,6 +360,8 @@ Worker_MakeAndInitialize(PSSDEWORKER *pWorkerContext)
         TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExAllocatePoolWithTag failed: %!STATUS!", Status);
         goto finalize;
     }
+    
+    RtlZeroMemory(WorkerContext, sizeof(SSDEWORKER));
 
     *pWorkerContext = WorkerContext;
 

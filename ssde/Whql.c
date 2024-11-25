@@ -270,6 +270,9 @@ WhqlWorker_MakeAndInitialize(PWHQLSSDEWORKER *__this)
         TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_DRIVER, "%!FUNC! ExAllocatePoolWithTag failed: %!STATUS!", Status);
         goto finalize;
     }
+
+    RtlZeroMemory(_this, sizeof(WHQLSSDEWORKER));
+
     *__this = _this;
 
     Status = ZwCreateEvent(
